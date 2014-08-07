@@ -57,9 +57,10 @@ int main(int argc, char *argv[])
 //		else
 //		  printf("Server:NULL\n");
 		printf("%d\n",user.fd);
-		printf("Key in your name>>:");
-		scanf("%s",user.username);
-		send(user.fd, user.username, sizeof(user.username), 0);
+	//	printf("Key in your name>>:");
+		authorise_client(user.fd);
+		//scanf("%s",user.username);
+		//send(user.fd, user.username, sizeof(user.username), 0);
 		pthread_t pid1, pid2;
 		pthread_create(&pid1, NULL, client_recv,(void *)&user);
 		pthread_create(&pid2, NULL, client_send,(void *)&user);

@@ -30,6 +30,10 @@ int main(int argc, char *argv[])
 	pthread_t pid[LIST_MAX];
 	struct sockaddr_in server_addr, client_addr;
 	USER user[LIST_MAX];
+	FILE *fp;
+	
+	fp = fopen("Clients","w");
+	fclose(fp);
 	
 	client_addr_len = sizeof(client_addr);
 
@@ -81,8 +85,9 @@ int main(int argc, char *argv[])
 	//	{
 			//send_msg(s_msg, client_fd, sizeof(s_msg));
 	 /*   printf("%d\n",client_fd);*/
-			r_len = receive_msg(user[clients].username, user[clients].fd, sizeof(user[clients].username));
+	//		r_len = receive_msg(user[clients].username, user[clients].fd, sizeof(user[clients].username));
 			user[clients].fd = t;
+			authorise_server(user[clients].fd, user[clients].username);
 			printf("%s,--%d\n",user[clients].username, user[clients].fd);
 			add_to_stud(&head,user[clients]);
 			pthread_create(&pid[clients],NULL,serve_chat,(void *)&user[clients]);
