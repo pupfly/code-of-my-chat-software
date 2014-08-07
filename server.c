@@ -20,15 +20,21 @@
 
 int main(int argc, char *argv[])
 {
-	int server_fd,client_fd,client_addr_len;
+	int server_fd, client_addr_len;
 	int r_len;//接收数据的长度
 	int optval = 1;
+	int clients = 0;
+	int t;
 	char s_msg[MSG_MAX_L];
 	char r_msg[MSG_MAX_L];
-	pid_t pid;
+	pthread_t pid[LIST_MAX];
 	struct sockaddr_in server_addr, client_addr;
+	USER user[LIST_MAX];
+	
 	client_addr_len = sizeof(client_addr);
 
+	head.next = NULL;
+	
 	if ((server_fd = socket(AF_INET, SOCK_STREAM, 0)) < 0)
 	{
 		my_err("socket", __LINE__);
@@ -54,38 +60,41 @@ int main(int argc, char *argv[])
 		my_err("listen", __LINE__);
 	}
 
-	while(1)
+	while(clients < LIST_MAX)
 	{
-	  if ((client_fd = accept(server_fd, (struct sockaddr *)&client_addr, &client_addr_len)) < 0)
+	  if ((user[clients].fd = accept(server_fd, (struct sockaddr *)&client_addr, &client_addr_len)) < 0)
 		{
 			my_err("accept", __LINE__);
 		}
 	  printf("Detected New Client,IP:%s\n",inet_ntoa(client_addr.sin_addr));
-	  pid = fork();
-	  if (pid == 0)
+	  t = user[clients].fd;
+	  printf("clients: %d,id:--%d\n",clients,user[clients].fd);
+	 /* if (pid == 0)
 	  {
-		while(1)
-		{
-			printf("Key in your word>>:");
-			send_msg(s_msg, client_fd, sizeof(s_msg));
-//			memset(s_msg,0,sizeof(s_msg));
-//			gets(s_msg);
-//			send(client_fd,s_msg,strlen(s_msg),0);
-//			memset(r_msg,0,sizeof(r_msg));
-			r_len = receive_msg(r_msg, client_fd, sizeof(r_msg));
-			if (strcmp(r_msg,"server_exit") == 0)
-			  break;
-			if (r_len > 0)
-			  printf("Client: %s\n",r_msg);
-			else
-			  printf("Client:\n");
-		}
+	    USER user, other;
+	    MSG msg;
+	    FILE *fp;
+	    char filename[12];
+	    user.fd = client_fd;
+	    pthread_t tid1, tid2;*/
+	//	while(1)
+	//	{
+			//send_msg(s_msg, client_fd, sizeof(s_msg));
+	 /*   printf("%d\n",client_fd);*/
+			r_len = receive_msg(user[clients].username, user[clients].fd, sizeof(user[clients].username));
+			user[clients].fd = t;
+			printf("%s,--%d\n",user[clients].username, user[clients].fd);
+			add_to_stud(&head,user[clients]);
+			pthread_create(&pid[clients],NULL,serve_chat,(void *)&user[clients]);
+			clients++;
+		//	pthread_create(&tid2,NULL,serve_write,(void *)&other);
+	//	}
 	  }
-	  else
+	 /* else
 	  {
 		  close(client_fd);
 	  }
-	}
+	}*/
 	return 0;
 }
 
