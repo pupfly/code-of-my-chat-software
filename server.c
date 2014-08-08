@@ -25,8 +25,8 @@ int main(int argc, char *argv[])
 	int optval = 1;
 	int clients = 0;
 	int t;
-	char s_msg[MSG_MAX_L];
-	char r_msg[MSG_MAX_L];
+	char r_msg[MSG_MAX_L] , s_msg[MSG_MAX_L];
+	char result = 'n';
 	pthread_t pid[LIST_MAX];
 	struct sockaddr_in server_addr, client_addr;
 	USER user[LIST_MAX];
@@ -87,9 +87,19 @@ int main(int argc, char *argv[])
 	 /*   printf("%d\n",client_fd);*/
 	//		r_len = receive_msg(user[clients].username, user[clients].fd, sizeof(user[clients].username));
 			user[clients].fd = t;
-			authorise_server(user[clients].fd, user[clients].username);
+			user[clients].order = &clients;
+			user[clients].result = 'n';
+	/*		while(1) 
+			{
+			  receive_msg(r_msg, user[clients].fd, sizeof(r_msg));
+			  switch(r_msg[0])
+			  {
+			    case '1':
+			      authorise_server(user[clients].fd, user[clients].username);
+			      
+			}
 			printf("%s,--%d\n",user[clients].username, user[clients].fd);
-			add_to_stud(&head,user[clients]);
+			add_to_stud(&head,user[clients]);*/
 			pthread_create(&pid[clients],NULL,serve_chat,(void *)&user[clients]);
 			clients++;
 		//	pthread_create(&tid2,NULL,serve_write,(void *)&other);

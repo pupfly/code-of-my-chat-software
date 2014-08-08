@@ -26,6 +26,9 @@ int main(int argc, char *argv[])
 	char r_msg[MSG_MAX_L];
 	struct sockaddr_in server_addr;
 	USER user;
+	pthread_t pid1, pid2;
+	
+	user.result = 'n';
 	server_addr_len = sizeof(server_addr);
 	
 	if ((user.fd = socket(AF_INET, SOCK_STREAM, 0)) < 0)
@@ -46,35 +49,43 @@ int main(int argc, char *argv[])
 	}
 	else
 	  printf("Msg From Server:Welcom !\n");
-//	while(1)
+	printf("你的套接字描述符: %d\n",user.fd);
+	while(user.result != 'y')
 	{
-//		r_len = 0;
-//		r_len = receive_msg(r_msg, client_fd,sizeof(r_msg));
-//		memset(r_msg,0,sizeof(r_msg));
-//		r_len = recv(client_fd,r_msg,sizeof(r_msg),0);
-//		if (r_len > 0)
-//		  printf("Server: %s\n",r_msg);
-//		else
-//		  printf("Server:NULL\n");
-		printf("%d\n",user.fd);
-	//	printf("Key in your name>>:");
-		authorise_client(user.fd);
-		//scanf("%s",user.username);
-		//send(user.fd, user.username, sizeof(user.username), 0);
-		pthread_t pid1, pid2;
-		pthread_create(&pid1, NULL, client_recv,(void *)&user);
-		pthread_create(&pid2, NULL, client_send,(void *)&user);
-		
-		pthread_join(pid1,(void *)&status1);
-		pthread_join(pid2,(void *)&status2);
-//		memset(s_msg,0,sizeof(s_msg));
-//		gets(s_msg);
-//		send(client_fd,s_msg,strlen(s_msg),0);
-		//if (strcmp(s_msg,"client_exit") == 0)
-		  //break;
-		
+	  menu();
+	  input_string(s_msg,sizeof(s_msg));
+	  switch(s_msg[0])
+	  {
+	    case '1':
+	      send(user.fd, s_msg, strlen(s_msg), 0);
+	      authorise_client(user.fd,&user);
+	      if (user.result == 'y')
+		break;
+	      else
+	      {
+		close(user.fd);
+		return;
+	      }
+	      break;
+	    case '2':
+	      send(user.fd, s_msg, strlen(s_msg), 0);
+	      login_client(user.fd, user.username,&(user.result));
+	      if (user.result == 'y')
+		break;
+	      else
+	      {
+		close(user.fd);
+		return;
+	      }
+	      break;
+	  }
 	}
-	//close(client_fd);
+	
+	pthread_create(&pid1, NULL, client_recv,(void *)&user);
+	pthread_create(&pid2, NULL, client_send,(void *)&user);
+	
+	pthread_join(pid1,(void *)&status1);
+	pthread_join(pid2,(void *)&status2);
 	return 0;
 }
 
