@@ -26,6 +26,7 @@ int main(int argc, char *argv[])
 	char r_msg[MSG_MAX_L];
 	struct sockaddr_in server_addr;
 	USER user;
+	MSG msg;
 	pthread_t pid1, pid2;
 	
 	user.result = 'n';
@@ -52,12 +53,13 @@ int main(int argc, char *argv[])
 	printf("你的套接字描述符: %d\n",user.fd);
 	while(user.result != 'y')
 	{
-	  menu();
+	  mainmenu();
 	  input_string(s_msg,sizeof(s_msg));
 	  switch(s_msg[0])
 	  {
 	    case '1':
-	      send(user.fd, s_msg, strlen(s_msg), 0);
+	      strcpy(msg.command,"sys_authorise");
+	      send(user.fd, &msg, MSG_L, 0);
 	      authorise_client(user.fd,&user);
 	      if (user.result == 'y')
 		break;
@@ -68,7 +70,8 @@ int main(int argc, char *argv[])
 	      }
 	      break;
 	    case '2':
-	      send(user.fd, s_msg, strlen(s_msg), 0);
+	      strcpy(msg.command,"sys_login");
+	      send(user.fd, &msg, MSG_L, 0);
 	      login_client(user.fd, user.username,&(user.result));
 	      if (user.result == 'y')
 		break;

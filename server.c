@@ -32,7 +32,7 @@ int main(int argc, char *argv[])
 	USER user[LIST_MAX];
 	FILE *fp;
 	
-	fp = fopen("Clients","w");
+	fp = fopen("Clients","a");
 	fclose(fp);
 	
 	client_addr_len = sizeof(client_addr);
@@ -73,43 +73,14 @@ int main(int argc, char *argv[])
 	  printf("Detected New Client,IP:%s\n",inet_ntoa(client_addr.sin_addr));
 	  t = user[clients].fd;
 	  printf("clients: %d,id:--%d\n",clients,user[clients].fd);
-	 /* if (pid == 0)
-	  {
-	    USER user, other;
-	    MSG msg;
-	    FILE *fp;
-	    char filename[12];
-	    user.fd = client_fd;
-	    pthread_t tid1, tid2;*/
-	//	while(1)
-	//	{
-			//send_msg(s_msg, client_fd, sizeof(s_msg));
-	 /*   printf("%d\n",client_fd);*/
-	//		r_len = receive_msg(user[clients].username, user[clients].fd, sizeof(user[clients].username));
-			user[clients].fd = t;
-			user[clients].order = &clients;
-			user[clients].result = 'n';
-	/*		while(1) 
-			{
-			  receive_msg(r_msg, user[clients].fd, sizeof(r_msg));
-			  switch(r_msg[0])
-			  {
-			    case '1':
-			      authorise_server(user[clients].fd, user[clients].username);
-			      
-			}
-			printf("%s,--%d\n",user[clients].username, user[clients].fd);
-			add_to_stud(&head,user[clients]);*/
-			pthread_create(&pid[clients],NULL,serve_chat,(void *)&user[clients]);
-			clients++;
-		//	pthread_create(&tid2,NULL,serve_write,(void *)&other);
-	//	}
-	  }
-	 /* else
-	  {
-		  close(client_fd);
-	  }
-	}*/
+	 
+	  user[clients].fd = t;
+	  user[clients].order = &clients;
+	  user[clients].result = 'n';
+	  pthread_create(&pid[clients],NULL,serve_chat,(void *)&user[clients]);
+	  clients++;
+	}
+	  
 	return 0;
 }
 

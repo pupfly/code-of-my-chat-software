@@ -39,12 +39,16 @@
 #define ADDR_L 12      //用户地址长度,用于注册
 #define SIG_L 50         //个性签名长度
 #define PSD_L 16   //密码长度
-#define IS_EXIT(a)   if (strcmp(a,"exit") == 0) return//判断是否要退出
+#define IS_EXIT(a,b)   if (strcmp(a,"exit") == 0) {send(b, a, strlen(a), 0); return;}//判断是否要退出
+#define MSG_L sizeof(MSG) //消息结构体大小
 
-typedef struct//信息结构体,flag为1表示未发送
+typedef struct//信息结构体
 {
-  int flag;
-  char msg[MSG_MAX_L];
+  char command[24];//消息类型,single_chat私聊,group_chat为群聊,sys_authorize为注册命令,sys_login为登陆命令
+  int flag;//flag为1表示已发送
+  char sender[NAME_L];//发送者
+  char receiver[NAME_L];//接受者
+  char msg[MSG_MAX_L];//信息
 }MSG;
 
 typedef struct//用于保存在线客户的套接字的用户结构体
@@ -75,11 +79,11 @@ STUD head;
 
 void my_err(char *,int line);//自定义错误函数
 
-int input_msg(char *, char *, char *, int);//自定义输入信息函数,信息会被处理为含发送和接受者的格式
-
 int input_string(char string[], int str_len);//自定义输入函数,代替gets
 
-void menu();//在客户端打印菜单的函数
+void mainmenu();//在客户端打印菜单的函数
+
+void submenu(char username[NAME_L]);//在客户端打印子菜单的函数
 
 void add_to_stud(STUD *head , USER user);//链表插入函数,向系统登记在线的用户信息,包括套接字和姓名
 
@@ -87,11 +91,13 @@ void delete_from_stud(STUD *head , USER user);//链表删除节点函数,向系�
 
 STUD *search_stud(STUD *head, char name_to_find[NAME_L]);//搜索链表信息,返回节点指针
 
-int send_msg(char *, char *,  char *, int, int);//发送数据函数,缓存区,发送者,接受者,描述符,缓存大小
+int send_msg(MSG *msg, int fd, char cmd[24]);//发送数据函数,缓存区,发送者,接受者,描述符,缓存大小
 
-int receive_msg(char *,int, int);//接收数据函数
+int receive_msg(MSG *,int, int);//接收结构体数据函数
 
-void send_to_one(char *, char *, char *, int fd);//从消息里面解析出接受者并向其发送
+int receive(char *,int, int);//接收字符数据函数
+
+void send_to_one(MSG*, int);//从消息里面解析出接受者并向其发送
 
 void *serve_chat(void *arg);//扫描文件并发送信息
 
@@ -112,3 +118,7 @@ int is_client_exist(int *flag, char *person, char *password);//查询用户是�
 void login_serve(int fd, char username[NAME_L], char *result);//登陆函数,用于服务端
 
 void login_client(int fd, char username[NAME_L], char *result);//登陆函数,用于客户端
+
+void create_serve(char flag, USER user);//创建群或添加联系人,用flag,标记功能,用于服务端
+
+void add_friend_client(char flag, USER user);//添加好友,也可向群里面添加,用flag标记功能,用于客户端

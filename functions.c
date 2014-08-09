@@ -22,35 +22,34 @@ void my_err(char *str, int line)
 {
 	fprintf(stderr, "line:%d ", line);
 	perror(str);
-	exit(1);
+	return;
 }
 
-int input_msg(char msg[], char sender[], char receiver[], int msg_len)
-{
-	int len = 0;
-	char c;
-	memset(msg, 0, msg_len);
-	strcpy(msg,"s ");
-	strcat(msg,sender);
-	strcat(msg," ");
-	strcat(msg,receiver);
-	len = strlen(msg);
-	msg[len++] = ' ';
-	while (((c = getchar()) != '\n') && (len < MSG_MAX_L))
-	{
-		msg[len++] = c;
-	}
-	return len;
-}
-
-void menu()//在客户端打印菜单的函数
+void mainmenu()//在客户端打印菜单的函数
 {
   printf("--------飞哥传书--------\n");
-  printf("         1.注册账号\n");
-  printf("         2.用户登录\n");
-  printf("         3.退出系统\n");
+  printf("       1.注册账号\n");
+  printf("       2.用户登录\n");
+  printf("       3.退出系统\n");
   printf("请选择:");
 }
+
+void submenu(char username[NAME_L])//在客户端打印子菜单的函数
+{
+  printf("--------%s--------\n",username);
+  printf("       1.我的资料\n");
+  printf("       2.我的好友\n");
+  printf("       3.在线好友\n");
+  printf("       4.我加的群\n");
+  printf("       5.添加好友\n");
+  printf("       6.管理的群\n");
+  printf("       7.好友私聊\n");
+  printf("       8.开启群聊\n");
+  printf("       9.修改资料\n");
+  printf("       0.注销登录\n");
+  printf("请选择:");
+}
+
 
 int input_string(char string[], int str_len)//自定义输入函数,代替gets
 {
@@ -107,17 +106,26 @@ STUD *search_stud(STUD *head, char name_to_find[NAME_L])//搜索链表信息,返
   return NULL;
 }
 
-int send_msg(char msg[],char sender[], char receiver[],  int fd,int msg_len)
+int send_msg(MSG *msg, int fd, char cmd[24])
 {
 	int len = 0;//记录信息长度
 
-	len = input_msg(msg,sender, receiver, msg_len);
+	len = input_string((*msg).msg,MSG_MAX_L);
 
-	if (strlen(msg) > (strlen(sender) + strlen(receiver) + 4))
+	if (strcmp(cmd,"single_chat") == 0)
 	{
-		if (send(fd, msg, strlen(msg), 0) < 0)
-			my_err("send",__LINE__);
-		return len;
+	  while(strcmp((*msg).msg,"exit") != 0)
+	  {
+	    if (len > 0)
+	    {
+	      if (send(fd, msg, sizeof(MSG), 0) < 0)
+	      {
+		my_err("send",__LINE__);
+	      }
+	    }
+	  printf("%s:",msg->sender);
+	  len = input_string((*msg).msg,MSG_MAX_L);
+	  }
 	}
 	else
 	{
@@ -125,86 +133,76 @@ int send_msg(char msg[],char sender[], char receiver[],  int fd,int msg_len)
 	}
 }
 
-int receive_msg(char msg[], int fd,int msg_buf_len)
+int receive_msg(MSG *msg, int fd, int msg_buf_len)
 {
 	int len = 0;//记录信息长度
 
-	memset(msg, 0, sizeof(msg));
+	memset(msg, 0, sizeof(MSG));
 	
 	if ((len = recv(fd, msg, msg_buf_len, 0)) < 0)
 	{
 		printf("receive error\n");
 		return -1;
 	}
-	msg[len] = '\0';
 	return len;
 }
 
-void send_to_one(char msg_r[MSG_MAX_L], char msg_to_send[MSG_MAX_L], char receiver[NAME_L], int fd)//从消息里面解析出接受者并向其发送
+int receive(char msg[],int fd, int msg_len)//接收字符数据函数
 {
-  int i = 0, j = 0, k = 0, t = 0;
-  STUD *p;
+  int len = 0;
   
-    while(msg_r[i++] != '\0')
-      {
-	if (msg_r[i - 1] == ' ')
+  memset(msg, 0, msg_len);
+  
+  if ((len = recv(fd, msg, msg_len, 0)) < 0)
 	{
-	  j++;
-	  if (j == 2)
-	  {
-	    t = i;
-	    while(msg_r[t++] != ' ')
-	    {
-	      receiver[k++] = msg_r[t - 1];
-	    }
-	    receiver[k] = '\0';
-	  }
-	  if (j == 3)
-	    break;
+		printf("receive error\n");
+		return -1;
 	}
-      }
-      j = 0;
-      while(msg_r[i++] != '\0')
+	return len;
+}
+
+void send_to_one(MSG *msg_r, int fd)//从消息里面解析出接受者并向其发送
+{
+  STUD *p;
+  MSG msg_s;
+  memset(&msg_s, 0, MSG_L);
+  
+  p = search_stud(&head,(* msg_r).receiver);
+  if (p != NULL)
       {
-	msg_to_send[j++] = msg_r[i - 1];
-      }
-      msg_to_send[j] = '\0';
-      p = search_stud(&head, receiver);
-      if (p != NULL)
-      {
-	if (send(p->user.fd, msg_to_send, strlen(msg_to_send), 0) == -1)
+	if (send(p->user.fd, msg_r, MSG_L, 0) == -1)
 	{
 	  my_err("send",__LINE__);
 	}
       }
-      else
-      {
-	send(fd, "无此联系人!",strlen("无此联系人!"), 0);
-      }
+  else
+  {
+    strcpy(msg_s.command,"single_chat");
+    strcpy(msg_s.msg,"无此联系人,请输入exit返回!");
+    strcpy(msg_s.sender,"服务器");
+    send(fd, &msg_s, MSG_L, 0);
+  }
 }
 
 void *serve_chat(void *arg)
 {
   USER *user = (USER *)arg;
-  //printf("user:%s,id:%d",user->username,user->fd);
-  char msg_r[MSG_MAX_L];
-  char msg_to_send[MSG_MAX_L];
-  char receiver[NAME_L];
   STUD *p;
+  MSG msg_cmd;
+  
   
   user->result = 'n';
   
   while(1)
   {
-    memset(msg_to_send, 0, MSG_MAX_L);
-    memset(receiver, 0, NAME_L);
-    if (receive_msg(msg_r, user->fd, MSG_MAX_L) < 0)
+    memset(&msg_cmd, 0, sizeof(MSG));
+    if (receive_msg(&msg_cmd, user->fd, sizeof(MSG)) < 0)
       break;
-    if (msg_r[0] == 's')
+    if (strcmp(msg_cmd.command,"single_chat") == 0)
     {
-      send_to_one(msg_r, msg_to_send, receiver,user->fd);
+      send_to_one(&msg_cmd, user->fd);
     }
-    else if (msg_r[0] == '1')
+    else if (strcmp(msg_cmd.command,"sys_authorise") == 0)
     {
       authorise_server(user->fd, user->username, &(user->result));
       if (user->result == 'y')
@@ -218,7 +216,7 @@ void *serve_chat(void *arg)
 	pthread_exit(0);
       }
     }
-    else if (msg_r[0] == '2')
+    else if (strcmp(msg_cmd.command,"sys_login") == 0)
     {
       login_serve(user->fd, user->username, &(user->result));
       if (user->result == 'y')
@@ -270,26 +268,37 @@ void *serve_chat(void *arg)
 void *client_recv(void *arg)
 {
   USER *user = (USER *)arg;
-  char msg_r[MSG_MAX_L];
+  MSG msg_r;
   while(1)
   {
-    receive_msg(msg_r,user->fd,sizeof(msg_r));
-    printf("%s\n",msg_r);
+    receive_msg(&msg_r,user->fd,MSG_L);
+    if (strcmp(msg_r.command,"single_chat") == 0)
+    {
+      printf("%s: %s\n",msg_r.sender,msg_r.msg);
+    }
   }
 }
 
 void *client_send(void *arg)
 {
   USER *user = (USER *)arg;
-  char msg_s[MSG_MAX_L];
-  char receiver[NAME_L];
-  
-  printf("key in receiver's name under this tip ! \n");
-  scanf("%s",receiver);
-  
+  MSG msg_s;
+  int choice = 0;
+   
   while(1)
   {
-    send_msg(msg_s, user->username, receiver, user->fd, sizeof(msg_s));
+    submenu(user->username);
+    scanf("%d",&choice);
+    switch(choice)
+    {
+      case 7:
+	printf("输入对方名称:");
+	scanf("%s",msg_s.receiver);
+	strcpy(msg_s.sender,user->username);
+	strcpy(msg_s.command,"single_chat");
+	send_msg(&msg_s, user->fd, msg_s.command); 
+	break;
+    }
   }
 }
 
@@ -348,42 +357,42 @@ void authorise_server(int fd, char username[NAME_L], char *result)//用户注册
   
   *result = 'n';
   
-  receive_msg(client.name,fd,sizeof(client.name));
-  IS_EXIT(client.name);
+  receive(client.name,fd,sizeof(client.name));
+  IS_EXIT(client.name,fd);
   is_name_used(&flag, client.name);
 while(is_name_used(&flag, client.name))
 {
       send(fd, "fail",strlen("fail"), 0);
-       receive_msg(client.name,fd,sizeof(client.name));
-       IS_EXIT(client.name);
+       receive(client.name,fd,sizeof(client.name));
+       IS_EXIT(client.name,fd);
 }
 
 send(fd, "success",strlen("success"), 0);
 
-while(receive_msg(client.password, fd, sizeof(client.password)) <= 0)
+while(receive(client.password, fd, sizeof(client.password)) <= 0)
 {
-  IS_EXIT(client.password);
+  IS_EXIT(client.password,fd);
   send(fd, "fail",strlen("fail"), 0);
 }
 
 send(fd, "success",strlen("success"), 0);
 
-while(receive_msg(client.addr, fd, sizeof(client.addr)) <= 0)
+while(receive(client.addr, fd, sizeof(client.addr)) <= 0)
 {
-  IS_EXIT(client.addr);
+  IS_EXIT(client.addr,fd);
   send(fd, "fail",strlen("fail"), 0);
 }
 
 send(fd, "success",strlen("success"), 0);
 
-while(receive_msg(client.sex, fd, sizeof(client.sex)) <= 0)
+while(receive(client.sex, fd, sizeof(client.sex)) <= 0)
 {
   send(fd, "fail",strlen("fail"), 0);
 }
 
 send(fd, "success",strlen("success"), 0);
 
-while(receive_msg(client.signature, fd, sizeof(client.signature)) <= 0)
+while(receive(client.signature, fd, sizeof(client.signature)) <= 0)
 {
   send(fd, "fail",strlen("fail"), 0);
 }
@@ -401,6 +410,7 @@ if (fwrite(&client, sizeof(client), 1, fp) == 0)
 else
 {
   printf("用户: %s 注册成功!\n",client.name);
+  *result = 'y';
   send(fd, "success",strlen("success"), 0);
   fclose(fp);
 }
@@ -421,42 +431,42 @@ void authorise_client(int fd, USER *user)//用户注册函数,客户端
   printf("请输入您的姓名或昵称(1~16)>>:\n");
   while(input_string(client.name, sizeof(client.name)) <= 0)
   {
-    IS_EXIT(client.name);
+    IS_EXIT(client.name,fd);
     printf("姓名不能为空,系统要求重新输入!\n");
     printf("请输入您的姓名或昵称(1~16)>>:\n");
   }
   send(fd, client.name,strlen(client.name), 0);
-  receive_msg(status, fd, sizeof(status));
-  IS_EXIT(status);
+  receive(status, fd, sizeof(status));
+  IS_EXIT(status,fd);
   while(strcmp(status,"fail") == 0)
   {
     printf("对不起,系统已存在用户: %s ,请重新输入>>:\n",client.name);
     input_string(client.name, sizeof(client.name));
-    IS_EXIT(client.name);
+    IS_EXIT(client.name,fd);
     send(fd, client.name,strlen(client.name), 0);
-    receive_msg(status, fd, sizeof(status));
-    IS_EXIT(status);
+    receive(status, fd, sizeof(status));
+    IS_EXIT(status,fd);
   }
   
   printf("用户名合法!\n请输入您的密码(1~16)>>:\n");
   input_string(client.password, sizeof(client.password));
-  IS_EXIT(client.password);
+  IS_EXIT(client.password,fd);
   printf("请确认您的密码(1~16)>>:\n");
   input_string(password_temp, sizeof(password_temp));
-  IS_EXIT(password_temp);
+  IS_EXIT(password_temp,fd);
   while (strcmp(password_temp,client.password) != 0)
   {
     printf("密码不一致,系统要求重新输入!\n");
     printf("请输入您的密码(1~16)>>:\n");
     input_string(client.password, sizeof(client.password));
-    IS_EXIT(client.password);
+    IS_EXIT(client.password,fd);
     printf("请确认您的密码(1~16)>>:\n");
     input_string(password_temp, sizeof(password_temp));
-    IS_EXIT(password_temp);
+    IS_EXIT(password_temp,fd);
   }
   send(fd, client.password,strlen(client.password), 0);
-  receive_msg(status, fd, sizeof(status));
-  IS_EXIT(status);
+  receive(status, fd, sizeof(status));
+  IS_EXIT(status,fd);
   if (strcmp(status,"fail") == 0)
     memset(password_temp, 0, sizeof(password_temp));
   while(strcmp(status,"fail") == 0)
@@ -468,64 +478,64 @@ void authorise_client(int fd, USER *user)//用户注册函数,客户端
       input_string(client.password, sizeof(client.password));
       printf("请确认您的密码(1~16)>>:\n");
       input_string(password_temp, sizeof(password_temp));
-      IS_EXIT(password_temp);
+      IS_EXIT(password_temp,fd);
     }
     send(fd, client.password,strlen(client.password), 0);
-    receive_msg(status, fd, sizeof(status));
-    IS_EXIT(status);
+    receive(status, fd, sizeof(status));
+    IS_EXIT(status,fd);
   }
   
   printf("请输入地址(1~12)>>:\n");
    input_string(client.addr, sizeof(client.addr));
-   IS_EXIT(client.addr);
+   IS_EXIT(client.addr,fd);
    send(fd, client.addr,strlen(client.addr), 0);
-   receive_msg(status, fd, sizeof(status));
-    IS_EXIT(status);
+   receive(status, fd, sizeof(status));
+    IS_EXIT(status,fd);
   while(strcmp(status,"fail") == 0)
   {
     printf("输入地址失败,请重新输入>>:\n");
     input_string(client.addr, sizeof(client.addr));
-    IS_EXIT(client.addr);
+    IS_EXIT(client.addr,fd);
    send(fd, client.addr,strlen(client.addr), 0);
-   receive_msg(status, fd, sizeof(status));
-   IS_EXIT(status);
+   receive(status, fd, sizeof(status));
+   IS_EXIT(status,fd);
   }
   
   printf("地址和法!\n请输入性别(男/女)>>:\n");
   input_string(client.sex, sizeof(client.sex));
-  IS_EXIT(client.sex);
+  IS_EXIT(client.sex,fd);
   while((strcmp(client.sex,"男") != 0) &&(strcmp(client.sex,"女") != 0))
   {
     printf("输入非法,系统要求重新输入!\n");
     printf("请输入性别(男/女)>>:\n");
     input_string(client.sex, sizeof(client.sex));
-    IS_EXIT(client.sex);
+    IS_EXIT(client.sex,fd);
   }
   send(fd, client.sex, strlen(client.sex), 0);
-  receive_msg(status, fd, sizeof(status));
-  IS_EXIT(status);
+  receive(status, fd, sizeof(status));
+  IS_EXIT(status,fd);
   while(strcmp(status,"fail") == 0)
   {
     printf("输入失败,请重新输入>>:\n");
     input_string(client.sex, sizeof(client.sex));
-    IS_EXIT(client.sex);
+    IS_EXIT(client.sex,fd);
     send(fd, client.sex, strlen(client.sex), 0);
-    receive_msg(status, fd, sizeof(status));
-    IS_EXIT(status);
+    receive(status, fd, sizeof(status));
+    IS_EXIT(status,fd);
   }
   
   printf("输入成功,请输入个性签名(1~50)>>:\n");
   while(input_string(client.signature, sizeof(client.signature)) == 0);
   send(fd, client.signature, strlen(client.signature), 0);
-  receive_msg(status, fd, sizeof(status));
+  receive(status, fd, sizeof(status));
   while(strcmp(status,"fail") == 0)
   {
     printf("输入失败,请重新输入>>:\n");
     input_string(client.signature, sizeof(client.signature));
     send(fd, client.signature, strlen(client.signature), 0);
-    receive_msg(status, fd, sizeof(status));
+    receive(status, fd, sizeof(status));
   }
-   receive_msg(status, fd, sizeof(status));
+   receive(status, fd, sizeof(status));
    if (strcmp(status,"success") == 0)
    {
      strcpy(user->username,client.name);
@@ -544,12 +554,12 @@ void login_serve(int fd, char username[NAME_L], char *result)//登陆函数,用�
   
   while(flag == 0)
   {
-    receive_msg(name, fd, sizeof(name));
+    receive(name, fd, sizeof(name));
     if (is_client_exist(&flag, name, password))
     {
       strcpy(username,name);
       send(fd, "password",strlen("password"), 0);
-      receive_msg(status, fd, sizeof(status));
+      receive(status, fd, sizeof(status));
       if (strcmp(status,"Y") == 0)
       {
 	send(fd, password, strlen(password), 0);
@@ -559,7 +569,7 @@ void login_serve(int fd, char username[NAME_L], char *result)//登陆函数,用�
     else
       send(fd, "userillegal", strlen("userillegal"), 0 );
   }
-  receive_msg(status, fd, sizeof(status));
+  receive(status, fd, sizeof(status));
   if (strcmp(status,"continue") == 0)
   {
     *result = 'n';
@@ -586,7 +596,7 @@ void login_client(int fd, char username[NAME_L], char *result)//登陆函数,用
   while(input_string(name, sizeof(name)) <= 0)
   printf("用户名不能为空,请重新输入!\n");
   send(fd, name, sizeof(name), 0);
-  receive_msg(status, fd, sizeof(status));
+  receive(status, fd, sizeof(status));
   while(strcmp(status,"password") != 0)
   {
     if (strcmp(status,"userillegal"))
@@ -601,10 +611,10 @@ void login_client(int fd, char username[NAME_L], char *result)//登陆函数,用
       printf("用户名不能为空,请重新输入!\n");
     }
     send(fd, name, sizeof(name), 0);
-    receive_msg(status, fd, sizeof(status));
+    receive(status, fd, sizeof(status));
   }
   send(fd, "Y", strlen("Y"), 0);
-  receive_msg(password, fd, sizeof(password));
+  receive(password, fd, sizeof(password));
   while (i-- > 0 )
   {
     j = 0;
@@ -614,7 +624,7 @@ void login_client(int fd, char username[NAME_L], char *result)//登陆函数,用
       password_temp[j - 1] += 1;
     if (strcmp(password,password_temp) == 0)
     {
-      printf("登陆成功!");
+      printf("登陆成功!\n");
       *result = 'y';
       break;
     }
@@ -633,3 +643,29 @@ void login_client(int fd, char username[NAME_L], char *result)//登陆函数,用
   }
   return;
 }
+
+/*void create_serve(char flag, USER user)//创建群或添加联系人,用flag,标记功能,用于服务端
+{
+  
+}
+
+void add_friend_client(char flag, USER user)//添加好友,也可向群里面添加,用flag标记功能,用于客户端
+{
+  char friendname[NAME_L];
+  
+  if (flag == 'g')
+  {
+    printf("要添加的好友>>:");
+   while(input_string(friendname, sizeof(friendname)) <= 0)
+    {
+      if (strcmp(friendname,"exit") ==0)
+      {
+	send(fd, "continue", strlen("continue"), 0);
+	return;
+      }
+      printf("用户名不能为空,请重新输入!\n");
+    }
+    send(fd, friendname, sizeof(friendname), 0);
+  }
+  
+}*/
