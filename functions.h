@@ -33,7 +33,7 @@
 #define PORT 6666        //端口
 #define LIST_MAX 500     //等待队列长度,系统可服务的最大客户数
 #define MSG_MAX_L 100   //每条消息信息最大长度
-#define SERVER_IP "222.24.51.63" //服务端IP
+#define SERVER_IP "192.168.1.105" //服务端IP
 #define NAME_L 16      //用户名长度
 #define STUD struct stud     //重命名链表结构体
 #define ADDR_L 12      //用户地址长度,用于注册
@@ -50,6 +50,12 @@ typedef struct//信息结构体
   char receiver[NAME_L];//接受者
   char msg[MSG_MAX_L];//信息
 }MSG;
+
+typedef struct
+{
+  char type;
+  char name[NAME_L];
+}LINKMAN;
 
 typedef struct//用于保存在线客户的套接字的用户结构体
 {
@@ -101,7 +107,7 @@ void send_to_one(MSG*, int);//从消息里面解析出接受者并向其发送
 
 void *serve_chat(void *arg);//扫描文件并发送信息
 
-void *serve_write(void *arg);//收到当前用户信息,写进对方文件,注意参数
+void *serve_save_msg(void *arg);//收到当前用户信息,对方不在线,将消息写进未发送链表,注意参数
 
 void *client_recv(void *arg);//客户端接收
 
@@ -119,6 +125,14 @@ void login_serve(int fd, char username[NAME_L], char *result);//登陆函数,用
 
 void login_client(int fd, char username[NAME_L], char *result);//登陆函数,用于客户端
 
-void create_serve(char flag, USER user);//创建群或添加联系人,用flag,标记功能,用于服务端
+void create_serve(MSG *msg, USER user);//创建群或添加联系人,用flag,标记功能,用于服务端
 
-void add_friend_client(char flag, USER user);//添加好友,也可向群里面添加,用flag标记功能,用于客户端
+void add_friend_client(MSG *msg, int fd);//添加好友,也可向群里面添加,用flag标记功能,用于客户端
+
+void show_me(MSG *msg, USER user);//显示用户信息
+
+void show_myfriend(MSG *msg, USER user);//显示所有好友包括群
+
+void show_friend_online(MSG *msg, USER user);//显示在线好友
+
+void show_mygroup(MSG *msg, USER user);//显示用户的群

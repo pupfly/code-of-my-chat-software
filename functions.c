@@ -27,15 +27,17 @@ void my_err(char *str, int line)
 
 void mainmenu()//在客户端打印菜单的函数
 {
-  printf("--------飞哥传书--------\n");
-  printf("       1.注册账号\n");
-  printf("       2.用户登录\n");
+  system("clear");
+  printf("--------飞哥传书--------\n\n\n");
+  printf("       1.注册账号\n\n");
+  printf("       2.用户登录\n\n");
   printf("       3.退出系统\n");
-  printf("请选择:");
+  printf("请选择>>:");
 }
 
 void submenu(char username[NAME_L])//在客户端打印子菜单的函数
 {
+  system("clear");
   printf("--------%s--------\n",username);
   printf("       1.我的资料\n");
   printf("       2.我的好友\n");
@@ -47,9 +49,8 @@ void submenu(char username[NAME_L])//在客户端打印子菜单的函数
   printf("       8.开启群聊\n");
   printf("       9.修改资料\n");
   printf("       0.注销登录\n");
-  printf("请选择:");
+  printf("请选择:\n");
 }
-
 
 int input_string(char string[], int str_len)//自定义输入函数,代替gets
 {
@@ -110,10 +111,9 @@ int send_msg(MSG *msg, int fd, char cmd[24])
 {
 	int len = 0;//记录信息长度
 
-	len = input_string((*msg).msg,MSG_MAX_L);
-
 	if (strcmp(cmd,"single_chat") == 0)
 	{
+	  len = input_string((*msg).msg,MSG_MAX_L);
 	  while(strcmp((*msg).msg,"exit") != 0)
 	  {
 	    if (len > 0)
@@ -126,6 +126,13 @@ int send_msg(MSG *msg, int fd, char cmd[24])
 	  printf("%s:",msg->sender);
 	  len = input_string((*msg).msg,MSG_MAX_L);
 	  }
+	}
+	else if (strcmp(cmd,"sys_add") == 0)
+	{
+	   if (send(fd, msg, sizeof(MSG), 0) < 0)
+	      {
+		my_err("send",__LINE__);
+	      }
 	}
 	else
 	{
@@ -230,6 +237,26 @@ void *serve_chat(void *arg)
 	pthread_exit(0);
       }
     }
+    else if ((strcmp(msg_cmd.command,"sys_add_g") == 0) || (strcmp(msg_cmd.command,"sys_add_s") == 0))
+    {
+      create_serve(&msg_cmd,*user);
+    }
+    else if (strcmp(msg_cmd.command,"sys_show_me") == 0)
+    {
+      show_me(&msg_cmd,*user);
+    }
+    else if  (strcmp(msg_cmd.command,"sys_show_myfriend") == 0)
+    {
+      show_myfriend(&msg_cmd,*user);
+    }
+    else if (strcmp(msg_cmd.command,"sys_show_online") == 0)
+    {
+      show_friend_online(&msg_cmd,*user);
+    }
+    else if (strcmp(msg_cmd.command,"sys_show_group") == 0)
+    {
+      show_mygroup(&msg_cmd,*user);
+    }
   }
 }
 
@@ -276,6 +303,10 @@ void *client_recv(void *arg)
     {
       printf("%s: %s\n",msg_r.sender,msg_r.msg);
     }
+    else if (strcmp(msg_r.command,"sys_add") == 0)
+    {
+      //add_friend_client();
+    }
   }
 }
 
@@ -283,15 +314,82 @@ void *client_send(void *arg)
 {
   USER *user = (USER *)arg;
   MSG msg_s;
-  int choice = 0;
+  char choice;
+  char flag;
    
   while(1)
   {
+    memset(&msg_s, 0, MSG_L);
     submenu(user->username);
-    scanf("%d",&choice);
+    scanf("%c",&choice);
     switch(choice)
     {
-      case 7:
+      case '1':
+	strcpy(msg_s.command,"sys_show_me");
+	strcpy(msg_s.receiver,"server");
+	strcpy(msg_s.sender,user->username);
+	system("clear");
+	printf("我的资料:\n");
+	send(user->fd, &msg_s, MSG_L, 0);
+	getchar();
+	getchar();
+	break;
+      case '2':
+	getchar();
+	strcpy(msg_s.command,"sys_show_myfriend");
+	strcpy(msg_s.receiver,"server");
+	strcpy(msg_s.sender,user->username);
+	system("clear");
+	printf("我的联系人:\n");
+	send(user->fd, &msg_s, MSG_L, 0);
+	getchar();
+	break;
+      case '3':
+	strcpy(msg_s.command,"sys_show_online");
+	strcpy(msg_s.receiver,"server");
+	strcpy(msg_s.sender,user->username);
+	system("clear");
+	printf("在线好友:\n");
+	send(user->fd, &msg_s, MSG_L, 0);
+	getchar();
+	getchar();
+	break;
+      case '4':
+	strcpy(msg_s.command,"sys_show_group");
+	strcpy(msg_s.receiver,"server");
+	strcpy(msg_s.sender,user->username);
+	system("clear");
+	printf("我在的群:\n");
+	send(user->fd, &msg_s, MSG_L, 0);
+	getchar();
+	getchar();
+	break;
+      case '5':
+	getchar();
+	strcpy(msg_s.sender,user->username);
+	strcpy(msg_s.receiver,"server");
+	while((flag != 'g') && (flag != 's'))
+	{
+	    printf("g:添加群\ns:添加好友\n请选择>>:\n");
+	    scanf("%c",&flag);
+	}
+	if (flag == 's')
+	{
+	  flag = '\0';
+	  strcpy(msg_s.command,"sys_add_s");
+	  add_friend_client(&msg_s,user->fd);
+	}
+	else if (flag == 'g')
+	{
+	  flag = '\0';
+	  strcpy(msg_s.command,"sys_add_g");
+	  add_friend_client(&msg_s,user->fd);
+	}
+	else
+	  break;
+	getchar();
+	break;
+      case '7':
 	printf("输入对方名称:");
 	scanf("%s",msg_s.receiver);
 	strcpy(msg_s.sender,user->username);
@@ -308,7 +406,7 @@ int is_name_used (int *flag, char *name)//查询用户名是否已被使用,被�
   CLIENT client;
   
   fp = fopen("Clients","r");
-  while(fread(&client, sizeof(client), 1, fp) != NULL)
+  while(fread(&client, sizeof(client), 1, fp) != 0)
   {
     if (strcmp(client.name,name) == 0)
     {
@@ -330,7 +428,7 @@ int is_client_exist(int *flag, char *name, char password[PSD_L])//查询用户�
   memset(password, 0, sizeof(password));
   
   fp = fopen("Clients","r");
-  while(fread(&client, sizeof(client), 1, fp) != NULL)
+  while(fread(&client, sizeof(client), 1, fp) != 0)
   {
     if (strcmp(client.name,name) == 0)
     {
@@ -644,28 +742,343 @@ void login_client(int fd, char username[NAME_L], char *result)//登陆函数,用
   return;
 }
 
-/*void create_serve(char flag, USER user)//创建群或添加联系人,用flag,标记功能,用于服务端
+void create_serve(MSG *msg, USER user)//创建群或添加联系人,用flag,标记功能,用于服务端
 {
+  char path[24];
+  int flag = 0;
+  char temp[24];
+  FILE *fp;
+  LINKMAN friend_user;
+  
+  memset(path, 0, sizeof(path));
+  
+  if (strcmp(msg->command,"sys_add_s") == 0)
+  {
+    if (is_name_used(&flag, msg->msg) == 0)
+    {
+      strcpy(msg->command,"single_chat");
+      strcpy(msg->sender,"server");
+      strcpy(msg->receiver,user.username);
+      strcpy(temp,msg->msg);
+      strcpy(msg->msg,"添加好友:");
+      strcat(msg->msg,temp);
+      strcat(msg->msg,"失败,未找到,请重试!");
+      send(user.fd, msg, MSG_L, 01);
+      return;
+    }
+    else if (flag == 1)
+    {
+      strcpy(friend_user.name,msg->msg);
+      friend_user.type = 'f';
+      strcpy(path,"L_");
+      strcat(path,user.username);
+      fp = fopen(path,"a");
+      if (fwrite(&friend_user, sizeof(LINKMAN), 1, fp) != 1)
+      {
+	strcpy(msg->command,"single_chat");
+	strcpy(msg->sender,"server");
+	strcpy(msg->receiver,user.username);
+	strcpy(temp,msg->msg);
+	strcpy(msg->msg,"添加好友:");
+	strcat(msg->msg,temp);
+	strcat(msg->msg,"失败,保存失败,请重试!");
+	send(user.fd, msg, MSG_L, 0);
+	fclose(fp);
+	return;
+      }
+      else
+      {
+	fclose(fp);
+	strcpy(msg->command,"single_chat");
+	strcpy(msg->sender,"server");
+	strcpy(msg->receiver,user.username);
+	strcpy(temp,msg->msg);
+	strcpy(msg->msg,"添加好友:");
+	strcat(msg->msg,temp);
+	strcat(msg->msg,"成功,点击enter继续!");
+	send(user.fd, msg, MSG_L, 0);
+	return;
+      }
+    }
+  }
+  else if (strcmp(msg->command,"sys_add_g") == 0)
+  {
+    strcpy(path,"G_");
+    strcat(path,msg->msg);
+    if ((fp = fopen(path,"r")) ==NULL)
+    {
+       strcpy(msg->command,"single_chat");
+      strcpy(msg->sender,"server");
+      strcpy(msg->receiver,user.username);
+      strcpy(temp,msg->msg);
+      strcpy(msg->msg,"添加群:");
+      strcat(msg->msg,temp);
+      strcat(msg->msg,"失败,未找到,请重试!");
+      send(user.fd, msg, MSG_L, 01);
+      return;
+    }
+    else
+    {
+      fclose(fp);
+      fp = fopen(path,"a");
+      if (fwrite(&friend_user, sizeof(LINKMAN), 1, fp) != 1)
+      {
+	strcpy(msg->command,"single_chat");
+	strcpy(msg->sender,"server");
+	strcpy(msg->receiver,user.username);
+	strcpy(temp,msg->msg);
+	strcpy(msg->msg,"添加群:");
+	strcat(msg->msg,temp);
+	strcat(msg->msg,"失败,保存失败,请重试!");
+	send(user.fd, msg, MSG_L, 0);
+	fclose(fp);
+	return;
+      }
+      else
+      {
+	fclose(fp);
+	strcpy(friend_user.name,msg->msg);
+	friend_user.type = 'g';
+	strcpy(msg->command,"single_chat");
+	strcpy(msg->sender,"server");
+	strcpy(msg->receiver,user.username);
+	strcpy(temp,msg->msg);
+	strcpy(msg->msg,"添加群:");
+	strcat(msg->msg,temp);
+	strcat(msg->msg,"成功,点击enter继续!");
+	send(user.fd, msg, MSG_L, 0);
+	return;
+      }
+    }
+  }
   
 }
 
-void add_friend_client(char flag, USER user)//添加好友,也可向群里面添加,用flag标记功能,用于客户端
-{
-  char friendname[NAME_L];
-  
-  if (flag == 'g')
+void add_friend_client(MSG *msg, int  fd)//添加好友,也可向群里面添加,用flag标记功能,用于客户端
+{ 
+  getchar();
+  if (strcmp(msg->command,"sys_add_g") == 0)
   {
-    printf("要添加的好友>>:");
-   while(input_string(friendname, sizeof(friendname)) <= 0)
+    printf("要添加的群>>:");
+   while(input_string(msg->msg, sizeof(msg->msg)) <= 0)
     {
-      if (strcmp(friendname,"exit") ==0)
+      if (strcmp(msg->msg,"exit") ==0)
       {
-	send(fd, "continue", strlen("continue"), 0);
+	//send(fd, "continue", strlen("continue"), 0);
 	return;
       }
-      printf("用户名不能为空,请重新输入!\n");
+      printf("群名不能为空,请重新输入!\n");
     }
-    send(fd, friendname, sizeof(friendname), 0);
+    send(fd, msg, MSG_L, 0);
+   return;
   }
+  else if (strcmp(msg->command,"sys_add_s") == 0)
+  {
+    printf("要添加的好友>>:");
+   while(input_string(msg->msg, sizeof(msg->msg)) <= 0)
+    {
+      if (strcmp(msg->msg,"exit") ==0)
+      {
+	//send(fd, "continue", strlen("continue"), 0);
+	return;
+      }
+      printf("名字不能为空,请重新输入!\n");
+    }
+    send(fd, msg, MSG_L, 0);
+   return;
+  }
+}
+
+void show_me(MSG *msg, USER user)//显示用户信息
+{
+  FILE *fp;
+  CLIENT me;
   
-}*/
+  memset(&me, 0, sizeof(me));
+  
+  fp = fopen("Clients","r");
+  while(fread(&me, sizeof(me), 1, fp) != 0)
+  {
+    if (strcmp(me.name,user.username) == 0)
+      break;
+  }
+  fclose(fp);
+  if (strcmp(me.name,user.username) == 0)
+  {
+    strcpy(msg->command,"single_chat");
+    strcpy(msg->sender,"账户名称");
+    strcpy(msg->receiver,user.username);
+    strcpy(msg->msg,me.name);
+    send(user.fd, msg, MSG_L, 0);
+    strcpy(msg->sender,"性    别");
+     strcpy(msg->msg,me.sex);
+    send(user.fd, msg, MSG_L, 0);
+    strcpy(msg->sender,"个性签名");
+     strcpy(msg->msg,me.signature);
+    send(user.fd, msg, MSG_L, 0);
+    strcpy(msg->sender,"我的地址");
+    strcpy(msg->msg,me.addr);
+    send(user.fd, msg, MSG_L, 0);
+    strcpy(msg->sender,"级    别");
+    strcpy(msg->msg,"普通用户");
+    send(user.fd, msg, MSG_L, 0);
+    strcpy(msg->sender,"server");
+    strcpy(msg->msg,"按enter键继续!");
+    send(user.fd, msg, MSG_L, 0);
+  }
+  else
+  {
+    strcpy(msg->command,"single_chat");
+    strcpy(msg->sender,"server");
+    strcpy(msg->receiver,user.username);
+    strcpy(msg->msg,"出意外了^_^|,竟然没找到你的信息,稍后再试吧!");
+    send(user.fd, msg, MSG_L, 0);
+    strcpy(msg->sender,"server");
+    strcpy(msg->msg,"按enter键继续!");
+    send(user.fd, msg, MSG_L, 0);
+  }
+}
+
+void show_myfriend(MSG *msg, USER user)//显示所有好友
+{
+  FILE *fp;
+ LINKMAN linkman;
+ char path[24];
+ STUD *p;
+ 
+ strcpy(path,"L_");
+ strcat(path,user.username);
+ strcpy(msg->command,"single_chat");
+ strcpy(msg->receiver,user.username);
+
+ fp = fopen(path,"r");
+ if (fp == NULL)
+ {
+   strcpy(msg->sender,"server");
+   strcpy(msg->msg,"你还没有添加任何好友或群组,按emter键继续!");
+   send(user.fd, msg, MSG_L, 0);
+   return;
+}
+
+strcpy(msg->sender,"联系人");
+
+ while(fread(&linkman, sizeof(linkman), 1, fp) != 0)
+ {
+   if (linkman.type == 'f')
+   {
+     p = search_stud(&head,linkman.name);
+     if (p != NULL)
+     {
+       strcpy(msg->msg,linkman.name);
+       strcat(msg->msg," 类型: 好友 状态: 在线");
+       send(user.fd, msg, MSG_L, 0);
+       p = NULL;
+       continue;
+    }
+    else
+    {
+       strcpy(msg->msg,linkman.name);
+       strcat(msg->msg," 类型: 好友 状态: 离线");
+       send(user.fd, msg, MSG_L, 0);
+       p = NULL;
+       continue;
+    }
+   }
+   else if (linkman.type == 'g')
+   {
+     strcpy(msg->msg,linkman.name);
+     strcat(msg->msg," 类型: 聊天群");
+     send(user.fd, msg, MSG_L, 0);
+     p = NULL;
+     continue;
+  }
+}
+  fclose(fp);
+   strcpy(msg->sender,"server");
+   strcpy(msg->msg,"按enter键继续!");
+   send(user.fd, msg, MSG_L, 0);
+   return;
+}
+
+void show_friend_online(MSG *msg, USER user)//显示在线好友
+{
+  FILE *fp;
+ LINKMAN linkman;
+ char path[24];
+ STUD *p;
+ 
+ strcpy(path,"L_");
+ strcat(path,user.username);
+ strcpy(msg->command,"single_chat");
+ strcpy(msg->receiver,user.username);
+
+ fp = fopen(path,"r");
+ if (fp == NULL)
+ {
+   strcpy(msg->sender,"server");
+   strcpy(msg->msg,"你还没有添加任何好友或群组,按emter键继续!");
+   send(user.fd, msg, MSG_L, 0);
+   return;
+}
+
+strcpy(msg->sender,"联系人");
+
+ while(fread(&linkman, sizeof(linkman), 1, fp) != 0)
+ {
+   if (linkman.type == 'f')
+   {
+     p = search_stud(&head,linkman.name);
+     if (p != NULL)
+     {
+       strcpy(msg->msg,linkman.name);
+       strcat(msg->msg,"  状态: 在线");
+       send(user.fd, msg, MSG_L, 0);
+       p = NULL;
+       continue;
+    }
+   }
+  }
+strcpy(msg->sender,"server");
+memset(msg->msg, 0, MSG_L);
+strcpy(msg->msg,"点击enter继续!");
+fclose(fp);
+send(user.fd, msg, MSG_L, 0);
+}
+
+void show_mygroup(MSG *msg, USER user)//显示用户的群
+{
+  FILE *fp;
+ LINKMAN linkman;
+ char path[24];
+ 
+ strcpy(path,"L_");
+ strcat(path,user.username);
+ strcpy(msg->command,"single_chat");
+ strcpy(msg->receiver,user.username);
+
+ fp = fopen(path,"r");
+ if (fp == NULL)
+ {
+   strcpy(msg->sender,"server");
+   strcpy(msg->msg,"你还没有添加任何好友或群组,按emter键继续!");
+   send(user.fd, msg, MSG_L, 0);
+   return;
+}
+
+strcpy(msg->sender,"群名");
+
+ while(fread(&linkman, sizeof(linkman), 1, fp) != 0)
+ {
+   if (linkman.type == 'g')
+   {
+       strcpy(msg->msg,linkman.name);
+       send(user.fd, msg, MSG_L, 0);
+       continue;
+    }
+   }
+strcpy(msg->sender,"server");
+memset(msg->msg, 0, MSG_L);
+strcpy(msg->msg,"点击enter继续!");
+fclose(fp);
+send(user.fd, msg, MSG_L, 0);
+}
