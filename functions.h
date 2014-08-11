@@ -33,7 +33,7 @@
 #define PORT 6666        //端口
 #define LIST_MAX 500     //等待队列长度,系统可服务的最大客户数
 #define MSG_MAX_L 100   //每条消息信息最大长度
-#define SERVER_IP "192.168.1.105" //服务端IP
+#define SERVER_IP "192.168.1.106" //服务端IP
 #define NAME_L 16      //用户名长度
 #define STUD struct stud     //重命名链表结构体
 #define ADDR_L 12      //用户地址长度,用于注册
@@ -69,10 +69,11 @@ typedef struct
 {
   char type;//普通用户或管理员
   char name[NAME_L];//姓名
+  char id[NAME_L];
   char password[PSD_L];//密码
   char addr[ADDR_L];//地址
   char sex[4];//性别
-  char signature[SIG_L];
+  char signature[SIG_L];//个性签名
 }CLIENT;
 
 struct stud
@@ -136,3 +137,7 @@ void show_myfriend(MSG *msg, USER user);//显示所有好友包括群
 void show_friend_online(MSG *msg, USER user);//显示在线好友
 
 void show_mygroup(MSG *msg, USER user);//显示用户的群
+
+void manage_group(MSG *msg, USER user);//群主用此函数管理群
+
+void manage_group_client(MSG* msg, USER user);//群管理的客户端函数

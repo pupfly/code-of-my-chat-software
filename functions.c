@@ -3,7 +3,7 @@
  *
  *       Filename:  fuctions.c
  *
- *    Description:  definations of all functions
+ *    D	escription:  definations of all functions
  *
  *        Version:  1.0
  *        Created:  2014年08月02日 15时13分06秒
@@ -43,7 +43,7 @@ void submenu(char username[NAME_L])//在客户端打印子菜单的函数
   printf("       2.我的好友\n");
   printf("       3.在线好友\n");
   printf("       4.我加的群\n");
-  printf("       5.添加好友\n");
+  printf("       5.好友管理\n");
   printf("       6.管理的群\n");
   printf("       7.好友私聊\n");
   printf("       8.开启群聊\n");
@@ -237,7 +237,7 @@ void *serve_chat(void *arg)
 	pthread_exit(0);
       }
     }
-    else if ((strcmp(msg_cmd.command,"sys_add_g") == 0) || (strcmp(msg_cmd.command,"sys_add_s") == 0))
+    else if ((strcmp(msg_cmd.command,"sys_add_g") == 0) || (strcmp(msg_cmd.command,"sys_add_s") == 0) || (strcmp(msg_cmd.command,"sys_delete_client") == 0)  || (strcmp(msg_cmd.command,"sys_delete_group") == 0))
     {
       create_serve(&msg_cmd,*user);
     }
@@ -256,6 +256,10 @@ void *serve_chat(void *arg)
     else if (strcmp(msg_cmd.command,"sys_show_group") == 0)
     {
       show_mygroup(&msg_cmd,*user);
+    }
+    else if (strcmp(msg_cmd.command,"sys_group_add") == 0 || strcmp(msg_cmd.command,"sys_group_del") == 0 || strcmp(msg_cmd.command,"sys_group_show") == 0)
+    {
+      manage_group(&msg_cmd,*user);
     }
   }
 }
@@ -366,11 +370,13 @@ void *client_send(void *arg)
 	break;
       case '5':
 	getchar();
+	system("clear");
 	strcpy(msg_s.sender,user->username);
 	strcpy(msg_s.receiver,"server");
-	while((flag != 'g') && (flag != 's'))
+	while((flag != 'g') && (flag != 's') && (flag != 'd') && (flag != 'q'))
 	{
-	    printf("g:添加群\ns:添加好友\n请选择>>:\n");
+	  printf("--------好友管理--------\n");
+	    printf("g:添加群\ns:添加好友\nd:删除用户\nq:退出一个群\n请选择>>:\n");
 	    scanf("%c",&flag);
 	}
 	if (flag == 's')
@@ -385,12 +391,60 @@ void *client_send(void *arg)
 	  strcpy(msg_s.command,"sys_add_g");
 	  add_friend_client(&msg_s,user->fd);
 	}
+	else if (flag == 'd')
+	{
+	  flag = '\0';
+	  strcpy(msg_s.command,"sys_delete_client");
+	  add_friend_client(&msg_s,user->fd);
+	}
+	else if (flag == 'q')
+	{
+	  flag = '\0';
+	  strcpy(msg_s.command,"sys_delete_group");
+	  add_friend_client(&msg_s,user->fd);
+	}
+	else
+	  break;
+	getchar();
+	break;
+      case '6':
+	getchar();
+	system("clear");
+	printf("--------群管理--------\n");
+	strcpy(msg_s.sender,user->username);
+	strcpy(msg_s.receiver,"server");
+	while((flag != 'l') && (flag != 's') && (flag != 'd'))
+	{
+	    printf("l:查看群成员\ns:添加成员\nd:删除用户\n请选择>>:\n");
+	    scanf("%c",&flag);
+	}
+	if (flag == 's')
+	{
+	  flag = '\0';
+	  strcpy(msg_s.command,"sys_group_add");
+	  manage_group_client(&msg_s,*user);
+	}
+	else if (flag == 'd')
+	{
+	  flag = '\0';
+	  strcpy(msg_s.command,"sys_group_del");
+	  manage_group_client(&msg_s,*user);
+	}
+	else if (flag == 'l')
+	{
+	  flag = '\0';
+	  getchar();
+	  strcpy(msg_s.command,"sys_group_show");
+	  strcpy(msg_s.receiver,"seerver");
+	  strcpy(msg_s.sender,user->username);
+	  send(user->fd, &msg_s, MSG_L, 0);
+	}
 	else
 	  break;
 	getchar();
 	break;
       case '7':
-	printf("输入对方名称:");
+	printf("输入对方ID:");
 	scanf("%s",msg_s.receiver);
 	strcpy(msg_s.sender,user->username);
 	strcpy(msg_s.command,"single_chat");
@@ -496,6 +550,7 @@ while(receive(client.signature, fd, sizeof(client.signature)) <= 0)
 }
 
 client.type = 'C';
+strcpy(client.id,client.name);
 
 if ((fp = fopen("Clients","a")) == NULL)
 {
@@ -526,12 +581,12 @@ void authorise_client(int fd, USER *user)//用户注册函数,客户端
   
   user->result = 'n';
   
-  printf("请输入您的姓名或昵称(1~16)>>:\n");
+  printf("请输入您的ID(1~16个字符)>>:\n");
   while(input_string(client.name, sizeof(client.name)) <= 0)
   {
     IS_EXIT(client.name,fd);
-    printf("姓名不能为空,系统要求重新输入!\n");
-    printf("请输入您的姓名或昵称(1~16)>>:\n");
+    printf("ID不能为空,系统要求重新输入!\n");
+    printf("请输入您的ID(1~16个字符)>>:\n");
   }
   send(fd, client.name,strlen(client.name), 0);
   receive(status, fd, sizeof(status));
@@ -546,7 +601,7 @@ void authorise_client(int fd, USER *user)//用户注册函数,客户端
     IS_EXIT(status,fd);
   }
   
-  printf("用户名合法!\n请输入您的密码(1~16)>>:\n");
+  printf("ID合法,初始用户名为%s,您可在注册成功后修改!\n请输入您的密码(1~16)>>:\n",client.name);
   input_string(client.password, sizeof(client.password));
   IS_EXIT(client.password,fd);
   printf("请确认您的密码(1~16)>>:\n");
@@ -690,14 +745,14 @@ void login_client(int fd, char username[NAME_L], char *result)//登陆函数,用
   char status[12];
   int i = 5, j = 0;
   
-  printf("用户名:");
+  printf("用户ID:");
   while(input_string(name, sizeof(name)) <= 0)
-  printf("用户名不能为空,请重新输入!\n");
+  printf("用户ID不能为空,请重新输入!\n");
   send(fd, name, sizeof(name), 0);
   receive(status, fd, sizeof(status));
   while(strcmp(status,"password") != 0)
   {
-    if (strcmp(status,"userillegal"))
+    if (strcmp(status,"userillegal") == 0)
       printf("用户不存在,请重新输入(exit 退出登录!)\n");
     while(input_string(name, sizeof(name)) <= 0)
     {
@@ -706,7 +761,7 @@ void login_client(int fd, char username[NAME_L], char *result)//登陆函数,用
 	send(fd, "continue", strlen("continue"), 0);
 	return;
       }
-      printf("用户名不能为空,请重新输入!\n");
+      printf("用户ID不能为空,请重新输入!\n");
     }
     send(fd, name, sizeof(name), 0);
     receive(status, fd, sizeof(status));
@@ -742,41 +797,428 @@ void login_client(int fd, char username[NAME_L], char *result)//登陆函数,用
   return;
 }
 
-void create_serve(MSG *msg, USER user)//创建群或添加联系人,用flag,标记功能,用于服务端
+void create_serve(MSG *msg, USER user)//添加或删除联系人与群,用flag,标记功能,用于服务端
 {
-  char path[24];
-  int flag = 0;
+  char path[24],path_t[24];
+  int flag;
   char temp[24];
-  FILE *fp;
+  FILE *fp, *fp2;
   LINKMAN friend_user;
   
   memset(path, 0, sizeof(path));
+  strcpy(path_t,"L_");
+  strcat(path_t,user.username);
+  
+  fp = fopen(path_t,"r");
+  if (strcmp(msg->command,"sys_delete_client") == 0)
+  {
+    if (fp == NULL)
+    {
+	  strcpy(msg->command,"single_chat");
+	  strcpy(msg->sender,"系统消息");
+	  strcpy(msg->receiver,user.username);
+	  strcpy(temp,msg->msg);
+	  strcpy(msg->msg,"任务未执行,并没有:");
+	  strcat(msg->msg,temp);
+	  strcat(msg->msg,",按enter键继续!");
+	  send(user.fd, msg, MSG_L, 0);
+	  return;
+    }
+    else
+    {
+      int is_there = 0;
+      while(fread(&friend_user, sizeof(friend_user),1, fp) != 0)
+      {
+	if (strcmp(friend_user.name,msg->msg) == 0)
+	{
+	  is_there = 1;
+	}
+      }
+      if (is_there == 0)
+      {
+	  strcpy(msg->command,"single_chat");
+	  strcpy(msg->sender,"系统消息");
+	  strcpy(msg->receiver,user.username);
+	  strcpy(temp,msg->msg);
+	  strcpy(msg->msg,"任务未执行,没有:");
+	  strcat(msg->msg,temp);
+	  strcat(msg->msg,",按enter键继续!");
+	  send(user.fd, msg, MSG_L, 0);
+	  fclose(fp);
+	  return;
+      }
+      fclose(fp);
+      char oldfile[26],newfile[26],name_to_del[NAME_L];
+      strcpy(name_to_del,msg->msg);
+      memset(newfile, 0, sizeof(newfile));
+      memset(oldfile, 0, sizeof(oldfile));
+      strcpy(oldfile,"L_");
+      strcat(oldfile,user.username);
+      strcpy(newfile,"T_");
+      strcat(newfile,user.username);
+      fp = fopen(oldfile,"r");
+      fp2 = fopen(newfile,"w");
+      while(fread(&friend_user, sizeof(friend_user),1, fp) != 0)
+      {
+	if (strcmp(friend_user.name,name_to_del) != 0)
+	{
+	  is_there++;
+	  if (fwrite(&friend_user, sizeof(friend_user), 1,fp2) != 1)
+	  {
+	    strcpy(msg->sender,"系统消息");
+	    strcpy(msg->receiver,user.username);
+	    strcpy(msg->msg,"任务执行出错,丢失了:");
+	    strcat(msg->msg,friend_user.name);
+	    strcat(msg->msg,",稍后请手动添加!");
+	    send(user.fd, msg, MSG_L, 0);
+	  }
+	}
+      }
+      fclose(fp);
+      fclose(fp2);
+      if (is_there > 1)
+      {
+	rename(newfile,oldfile);
+      }
+      else
+      {
+	fp = fopen(oldfile,"w");
+	fclose(fp);
+	remove(newfile);
+      }
+      memset(newfile, 0, sizeof(newfile));
+      memset(oldfile, 0, sizeof(oldfile));
+      strcpy(oldfile,"L_");
+      strcat(oldfile,name_to_del);
+      strcpy(newfile,"T_");
+      strcat(newfile,name_to_del);
+      fp = fopen(oldfile,"r");
+      fp2 = fopen(newfile,"w");
+      is_there = 1;
+      while(fread(&friend_user, sizeof(friend_user),1, fp) != 0)
+      {
+	if (strcmp(friend_user.name,user.username) != 0)
+	{
+	  is_there++;
+	  if (fwrite(&friend_user, sizeof(friend_user), 1,fp2) != 1)
+	  {
+	    strcpy(msg->sender,"系统消息");
+	    strcpy(msg->receiver,msg->msg);
+	    strcpy(msg->msg,"任务执行出错,丢失了:");
+	    strcat(msg->msg,friend_user.name);
+	    strcat(msg->msg,",稍后请手动添加!");
+	    send_to_one(msg, user.fd);
+	  }
+	}
+      }
+      fclose(fp);
+      fclose(fp2);
+      if (is_there > 1)
+      {
+	rename(newfile,oldfile);
+      }
+      else
+      {
+	fp = fopen(oldfile,"w");
+	fclose(fp);
+	remove(newfile);
+      }
+      strcpy(msg->command,"single_chat");
+      strcpy(msg->sender,"系统消息");
+      strcpy(msg->receiver,user.username);
+      strcpy(msg->msg,"删除:");
+      strcat(msg->msg,name_to_del);
+      strcat(msg->msg,"成功,同时已将你从对方好友列表删除,点击enter继续!");
+      send(user.fd, msg, MSG_L, 0);
+      strcpy(msg->command,"single_chat");
+      strcpy(msg->sender,"系统消息");
+      strcpy(msg->receiver,name_to_del);
+      strcpy(msg->msg,name_to_del);
+      strcat(msg->msg,"你好,");
+      strcat(msg->msg,user.username);
+      strcat(msg->msg," 已将你从好友列表删除,系统已替你将他/她删除,点击enter继续!");
+      send_to_one(msg, user.fd);
+      return;
+    }
+  }
+  if (strcmp(msg->command,"sys_delete_group") == 0)
+  {
+    if (fp == NULL)
+    {
+	  strcpy(msg->command,"single_chat");
+	  strcpy(msg->sender,"系统消息");
+	  strcpy(msg->receiver,user.username);
+	  strcpy(temp,msg->msg);
+	  strcpy(msg->msg,"任务未执行,并没有群:");
+	  strcat(msg->msg,temp);
+	  strcat(msg->msg,",按enter键继续!");
+	  send(user.fd, msg, MSG_L, 0);
+	  return;
+    }
+    else
+    {
+      int is_there = 0;
+      while(fread(&friend_user, sizeof(friend_user),1, fp) != 0)
+      {
+	if ((strcmp(friend_user.name,msg->msg) == 0) &&(friend_user.type == 'g'))
+	{
+	  is_there = 1;
+	}
+      }
+      if (is_there == 0)
+      {
+	  strcpy(msg->command,"single_chat");
+	  strcpy(msg->sender,"系统消息");
+	  strcpy(msg->receiver,user.username);
+	  strcpy(temp,msg->msg);
+	  strcpy(msg->msg,"任务未执行,没有找到群:");
+	  strcat(msg->msg,temp);
+	  strcat(msg->msg,",按enter键继续!");
+	  send(user.fd, msg, MSG_L, 0);
+	  fclose(fp);
+	  return;
+      }
+      fclose(fp);
+      char oldfile[26],newfile[26],name_to_del[NAME_L];
+      strcpy(name_to_del,msg->msg);
+      memset(newfile, 0, sizeof(newfile));
+      memset(oldfile, 0, sizeof(oldfile));
+      strcpy(oldfile,"L_");
+      strcat(oldfile,user.username);
+      strcpy(newfile,"T_");
+      strcat(newfile,user.username);
+      fp = fopen(oldfile,"r");
+      fp2 = fopen(newfile,"w");
+      while(fread(&friend_user, sizeof(friend_user),1, fp) != 0)
+      {
+	if (strcmp(friend_user.name,name_to_del) != 0 || friend_user.type == 'f')
+	{
+	  is_there++;
+	  if (fwrite(&friend_user, sizeof(friend_user), 1,fp2) != 1)
+	  {
+	    strcpy(msg->sender,"系统消息");
+	    strcpy(msg->receiver,user.username);
+	    strcpy(msg->msg,"任务执行出错,丢失了:");
+	    strcat(msg->msg,friend_user.name);
+	    strcat(msg->msg,",稍后请手动添加!");
+	    send(user.fd, msg, MSG_L, 0);
+	  }
+	}
+      }
+      fclose(fp);
+      fclose(fp2);
+      if (is_there > 1)
+      {
+	rename(newfile,oldfile);
+      }
+      else
+      {
+	fp = fopen(oldfile,"w");
+	fclose(fp);
+	remove(newfile);
+      }
+      memset(newfile, 0, sizeof(newfile));
+      memset(oldfile, 0, sizeof(oldfile));
+      strcpy(oldfile,"G_");
+      strcat(oldfile,name_to_del);
+      strcpy(newfile,"T_");
+      strcat(newfile,name_to_del);
+      fp = fopen(oldfile,"r");
+      fp2 = fopen(newfile,"w");
+      is_there = 1;
+      while(fread(&friend_user, sizeof(friend_user),1, fp) != 0)
+      {
+	if (strcmp(friend_user.name,user.username) != 0)
+	{
+	  is_there++;
+	  if (fwrite(&friend_user, sizeof(friend_user), 1,fp2) != 1)
+	  {
+	    strcpy(msg->sender,"系统消息");
+	    strcpy(msg->receiver,msg->msg);
+	    strcpy(msg->msg,"任务执行出错,丢失了:");
+	    strcat(msg->msg,friend_user.name);
+	    strcat(msg->msg,",稍后请手动添加!");
+	    send_to_one(msg, user.fd);
+	  }
+	}
+      }
+      fclose(fp);
+      fclose(fp2);
+      if (is_there > 1)
+      {
+	rename(newfile,oldfile);
+      }
+      else
+      {
+	fp = fopen(oldfile,"w");
+	fclose(fp);
+	remove(newfile);
+      }
+      strcpy(msg->command,"single_chat");
+      strcpy(msg->sender,"系统消息");
+      strcpy(msg->receiver,user.username);
+      strcpy(msg->msg,"删除群:");
+      strcat(msg->msg,name_to_del);
+      strcat(msg->msg,"成功,同时已将你从对方群的用户列表删除,点击enter继续!");
+      send(user.fd, msg, MSG_L, 0);
+      strcpy(msg->command,"single_chat");
+      strcpy(msg->sender,"系统消息");
+      strcpy(msg->receiver,name_to_del);
+      strcpy(msg->msg,name_to_del);
+      strcat(msg->msg,"你好,");
+      strcat(msg->msg,user.username);
+      strcat(msg->msg," 已从你的群退出,点击enter继续!");
+      send_to_one(msg, user.fd);
+      return;
+    }
+  }
+ 
+  if (strcmp(msg->command,"sys_add_g") == 0)
+  {
+    flag = 1;
+    if (fp != NULL)
+    {
+      memset(&friend_user, 0, sizeof(friend_user));
+      while(fread(&friend_user, sizeof(friend_user),1, fp) != 0)
+      {
+	if ((strcmp(friend_user.name,msg->msg) == 0) && (friend_user.type == 'g'))
+	{
+	  strcpy(msg->command,"single_chat");
+	  strcpy(msg->sender,"系统消息");
+	  strcpy(msg->receiver,user.username);
+	  strcpy(temp,msg->msg);
+	  strcpy(msg->msg,"任务没有执行,已有群:");
+	  strcat(msg->msg,temp);
+	  strcat(msg->msg,",按enter键继续!");
+	  send(user.fd, msg, MSG_L, 0);
+	  return;
+	}
+      }
+      flag = 0;
+      fclose(fp);
+    }
+    FILE *fp_t;
+    char path_now[24];
+    strcpy(path_now,"G_");
+    strcat(path_now,msg->msg);
+    if ((fp_t = fopen(path_now,"r")) == NULL)
+    {
+      strcpy(msg->command,"single_chat");
+      strcpy(msg->sender,"系统消息");
+      strcpy(msg->receiver,user.username);
+      strcpy(temp,msg->msg);
+      strcpy(msg->msg,"添加群: ");
+      strcat(msg->msg,temp);
+      strcat(msg->msg," 失败,未找到,请重试!");
+      send(user.fd, msg, MSG_L, 0);
+      return;
+    }
+    else
+    {
+      LINKMAN user_now;
+      user_now.type = 'f';
+      strcpy(user_now.name,user.username);
+      strcpy(friend_user.name,msg->msg);
+      friend_user.type = 'g';
+      memset(path, 0, sizeof(path));
+      strcpy(path,"L_");
+      strcat(path,user.username);
+      fp = fopen(path,"a");
+      memset(path_t, 0, sizeof(path_t));
+      strcpy(path_t,"G_");
+      strcat(path_t,msg->msg);
+      fp2 = fopen(path_t,"a");
+      if ((fwrite(&friend_user, sizeof(LINKMAN), 1, fp) != 1) || (fwrite(&user_now, sizeof(LINKMAN), 1, fp2) != 1))
+      {
+	strcpy(msg->command,"single_chat");
+	strcpy(msg->sender,"系统消息");
+	strcpy(msg->receiver,user.username);
+	strcpy(temp,msg->msg);
+	strcpy(msg->msg,"添加好友:");
+	strcat(msg->msg,temp);
+	strcat(msg->msg,"失败,保存失败,请重试!");
+	send(user.fd, msg, MSG_L, 0);
+	fclose(fp);
+	return;
+      }
+      else
+      {
+	fclose(fp);
+	fclose(fp2);
+	strcpy(msg->command,"single_chat");
+	strcpy(msg->sender,"系统消息");
+	strcpy(msg->receiver,user.username);
+	strcpy(temp,msg->msg);
+	strcpy(msg->msg,"添加群: ");
+	strcat(msg->msg,temp);
+	strcat(msg->msg," 成功,系统已添加你到此群列表,点击enter继续!");
+	send(user.fd, msg, MSG_L, 0);
+	strcpy(msg->command,"single_chat");
+	strcpy(msg->sender,"系统消息");
+	strcpy(msg->msg,"用户: ");
+	strcat(msg->msg,msg->receiver);
+	strcpy(msg->receiver,temp);
+	strcat(msg->msg,"已添加入你的群,系统已自动添加他/她到群列表,点击enter继续!");
+	send_to_one(msg, user.fd);
+	return;
+      }
+    }
+  }
+  if ((fp != NULL) && (strcmp(msg->command,"sys_delete_client") != 0))
+  {
+    while(fread(&friend_user, sizeof(friend_user),1, fp) != 0)
+    {
+      if ((strcmp(friend_user.name,msg->msg) == 0) && (friend_user.type == 'f'))
+      {
+	strcpy(msg->command,"single_chat");
+	strcpy(msg->sender,"系统消息");
+	strcpy(msg->receiver,user.username);
+	strcpy(temp,msg->msg);
+	strcpy(msg->msg,"任务未执行,已有:");
+	strcat(msg->msg,temp);
+	strcat(msg->msg,",按enter键继续!");
+	send(user.fd, msg, MSG_L, 0);
+	return;
+      }
+    }
+    flag = 0;
+    fclose(fp);
+  }
+  else
+    flag = 0;
   
   if (strcmp(msg->command,"sys_add_s") == 0)
   {
     if (is_name_used(&flag, msg->msg) == 0)
     {
       strcpy(msg->command,"single_chat");
-      strcpy(msg->sender,"server");
+      strcpy(msg->sender,"系统消息");
       strcpy(msg->receiver,user.username);
       strcpy(temp,msg->msg);
       strcpy(msg->msg,"添加好友:");
       strcat(msg->msg,temp);
       strcat(msg->msg,"失败,未找到,请重试!");
-      send(user.fd, msg, MSG_L, 01);
+      send(user.fd, msg, MSG_L, 0);
       return;
     }
     else if (flag == 1)
     {
+      LINKMAN user_now;
+      user_now.type = 'f';
+      strcpy(user_now.name,user.username);
       strcpy(friend_user.name,msg->msg);
       friend_user.type = 'f';
       strcpy(path,"L_");
       strcat(path,user.username);
       fp = fopen(path,"a");
-      if (fwrite(&friend_user, sizeof(LINKMAN), 1, fp) != 1)
+      memset(path_t, 0, sizeof(path_t));
+      strcpy(path_t,"L_");
+      strcat(path_t,msg->msg);
+      fp2 = fopen(path_t,"a");
+      if ((fwrite(&friend_user, sizeof(LINKMAN), 1, fp) != 1) || (fwrite(&user_now, sizeof(LINKMAN), 1, fp2) != 1))
       {
 	strcpy(msg->command,"single_chat");
-	strcpy(msg->sender,"server");
+	strcpy(msg->sender,"系统消息");
 	strcpy(msg->receiver,user.username);
 	strcpy(temp,msg->msg);
 	strcpy(msg->msg,"添加好友:");
@@ -789,68 +1231,27 @@ void create_serve(MSG *msg, USER user)//创建群或添加联系人,用flag,标�
       else
       {
 	fclose(fp);
+	fclose(fp2);
 	strcpy(msg->command,"single_chat");
-	strcpy(msg->sender,"server");
+	strcpy(msg->sender,"系统消息");
 	strcpy(msg->receiver,user.username);
 	strcpy(temp,msg->msg);
 	strcpy(msg->msg,"添加好友:");
 	strcat(msg->msg,temp);
-	strcat(msg->msg,"成功,点击enter继续!");
+	strcat(msg->msg,"成功,同时对方已添加你为好友,点击enter继续!");
 	send(user.fd, msg, MSG_L, 0);
+	strcpy(msg->command,"single_chat");
+	strcpy(msg->sender,"系统消息");
+	strcpy(msg->msg,"用户: ");
+	strcat(msg->msg,msg->receiver);
+	strcpy(msg->receiver,temp);
+	strcat(msg->msg,"已添加你为好友,已自动添加他/她为好友,点击enter继续!");
+	send_to_one(msg, user.fd);
 	return;
       }
     }
   }
-  else if (strcmp(msg->command,"sys_add_g") == 0)
-  {
-    strcpy(path,"G_");
-    strcat(path,msg->msg);
-    if ((fp = fopen(path,"r")) ==NULL)
-    {
-       strcpy(msg->command,"single_chat");
-      strcpy(msg->sender,"server");
-      strcpy(msg->receiver,user.username);
-      strcpy(temp,msg->msg);
-      strcpy(msg->msg,"添加群:");
-      strcat(msg->msg,temp);
-      strcat(msg->msg,"失败,未找到,请重试!");
-      send(user.fd, msg, MSG_L, 01);
-      return;
-    }
-    else
-    {
-      fclose(fp);
-      fp = fopen(path,"a");
-      if (fwrite(&friend_user, sizeof(LINKMAN), 1, fp) != 1)
-      {
-	strcpy(msg->command,"single_chat");
-	strcpy(msg->sender,"server");
-	strcpy(msg->receiver,user.username);
-	strcpy(temp,msg->msg);
-	strcpy(msg->msg,"添加群:");
-	strcat(msg->msg,temp);
-	strcat(msg->msg,"失败,保存失败,请重试!");
-	send(user.fd, msg, MSG_L, 0);
-	fclose(fp);
-	return;
-      }
-      else
-      {
-	fclose(fp);
-	strcpy(friend_user.name,msg->msg);
-	friend_user.type = 'g';
-	strcpy(msg->command,"single_chat");
-	strcpy(msg->sender,"server");
-	strcpy(msg->receiver,user.username);
-	strcpy(temp,msg->msg);
-	strcpy(msg->msg,"添加群:");
-	strcat(msg->msg,temp);
-	strcat(msg->msg,"成功,点击enter继续!");
-	send(user.fd, msg, MSG_L, 0);
-	return;
-      }
-    }
-  }
+  
   
 }
 
@@ -859,7 +1260,7 @@ void add_friend_client(MSG *msg, int  fd)//添加好友,也可向群里面添加
   getchar();
   if (strcmp(msg->command,"sys_add_g") == 0)
   {
-    printf("要添加的群>>:");
+    printf("要添加的群ID>>:");
    while(input_string(msg->msg, sizeof(msg->msg)) <= 0)
     {
       if (strcmp(msg->msg,"exit") ==0)
@@ -874,7 +1275,7 @@ void add_friend_client(MSG *msg, int  fd)//添加好友,也可向群里面添加
   }
   else if (strcmp(msg->command,"sys_add_s") == 0)
   {
-    printf("要添加的好友>>:");
+    printf("要添加的好友ID>>:");
    while(input_string(msg->msg, sizeof(msg->msg)) <= 0)
     {
       if (strcmp(msg->msg,"exit") ==0)
@@ -882,7 +1283,37 @@ void add_friend_client(MSG *msg, int  fd)//添加好友,也可向群里面添加
 	//send(fd, "continue", strlen("continue"), 0);
 	return;
       }
-      printf("名字不能为空,请重新输入!\n");
+      printf("ID不能为空,请重新输入!\n");
+    }
+    send(fd, msg, MSG_L, 0);
+   return;
+  }
+  else if (strcmp(msg->command,"sys_delete_client") == 0)
+    {
+    printf("要删除的好友ID>>:");
+   while(input_string(msg->msg, sizeof(msg->msg)) <= 0)
+    {
+      if (strcmp(msg->msg,"exit") ==0)
+      {
+	//send(fd, "continue", strlen("continue"), 0);
+	return;
+      }
+      printf("ID不能为空,请重新输入!\n");
+    }
+    send(fd, msg, MSG_L, 0);
+   return;
+  }
+  else if (strcmp(msg->command,"sys_delete_group") == 0)
+    {
+    printf("要删除的群ID>>:");
+   while(input_string(msg->msg, sizeof(msg->msg)) <= 0)
+    {
+      if (strcmp(msg->msg,"exit") ==0)
+      {
+	//send(fd, "continue", strlen("continue"), 0);
+	return;
+      }
+      printf("ID不能为空,请重新输入!\n");
     }
     send(fd, msg, MSG_L, 0);
    return;
@@ -908,6 +1339,10 @@ void show_me(MSG *msg, USER user)//显示用户信息
     strcpy(msg->command,"single_chat");
     strcpy(msg->sender,"账户名称");
     strcpy(msg->receiver,user.username);
+    strcpy(msg->msg,me.id);
+    send(user.fd, msg, MSG_L, 0);
+    strcpy(msg->sender,"账户  ID");
+    strcpy(msg->receiver,user.username);
     strcpy(msg->msg,me.name);
     send(user.fd, msg, MSG_L, 0);
     strcpy(msg->sender,"性    别");
@@ -922,18 +1357,18 @@ void show_me(MSG *msg, USER user)//显示用户信息
     strcpy(msg->sender,"级    别");
     strcpy(msg->msg,"普通用户");
     send(user.fd, msg, MSG_L, 0);
-    strcpy(msg->sender,"server");
+    strcpy(msg->sender,"系统消息");
     strcpy(msg->msg,"按enter键继续!");
     send(user.fd, msg, MSG_L, 0);
   }
   else
   {
     strcpy(msg->command,"single_chat");
-    strcpy(msg->sender,"server");
+    strcpy(msg->sender,"系统消息");
     strcpy(msg->receiver,user.username);
     strcpy(msg->msg,"出意外了^_^|,竟然没找到你的信息,稍后再试吧!");
     send(user.fd, msg, MSG_L, 0);
-    strcpy(msg->sender,"server");
+    strcpy(msg->sender,"系统消息");
     strcpy(msg->msg,"按enter键继续!");
     send(user.fd, msg, MSG_L, 0);
   }
@@ -954,13 +1389,13 @@ void show_myfriend(MSG *msg, USER user)//显示所有好友
  fp = fopen(path,"r");
  if (fp == NULL)
  {
-   strcpy(msg->sender,"server");
-   strcpy(msg->msg,"你还没有添加任何好友或群组,按emter键继续!");
+   strcpy(msg->sender,"系统消息");
+   strcpy(msg->msg,"你还没有添加任何好友或群组,按enter键继续!");
    send(user.fd, msg, MSG_L, 0);
    return;
 }
 
-strcpy(msg->sender,"联系人");
+strcpy(msg->sender,"联系人ID");
 
  while(fread(&linkman, sizeof(linkman), 1, fp) != 0)
  {
@@ -994,7 +1429,7 @@ strcpy(msg->sender,"联系人");
   }
 }
   fclose(fp);
-   strcpy(msg->sender,"server");
+   strcpy(msg->sender,"系统消息");
    strcpy(msg->msg,"按enter键继续!");
    send(user.fd, msg, MSG_L, 0);
    return;
@@ -1015,13 +1450,13 @@ void show_friend_online(MSG *msg, USER user)//显示在线好友
  fp = fopen(path,"r");
  if (fp == NULL)
  {
-   strcpy(msg->sender,"server");
-   strcpy(msg->msg,"你还没有添加任何好友或群组,按emter键继续!");
+   strcpy(msg->sender,"系统消息");
+   strcpy(msg->msg,"你还没有添加任何好友或群组,按enter键继续!");
    send(user.fd, msg, MSG_L, 0);
    return;
 }
 
-strcpy(msg->sender,"联系人");
+strcpy(msg->sender,"联系人ID");
 
  while(fread(&linkman, sizeof(linkman), 1, fp) != 0)
  {
@@ -1038,7 +1473,7 @@ strcpy(msg->sender,"联系人");
     }
    }
   }
-strcpy(msg->sender,"server");
+strcpy(msg->sender,"系统消息");
 memset(msg->msg, 0, MSG_L);
 strcpy(msg->msg,"点击enter继续!");
 fclose(fp);
@@ -1059,8 +1494,8 @@ void show_mygroup(MSG *msg, USER user)//显示用户的群
  fp = fopen(path,"r");
  if (fp == NULL)
  {
-   strcpy(msg->sender,"server");
-   strcpy(msg->msg,"你还没有添加任何好友或群组,按emter键继续!");
+   strcpy(msg->sender,"系统消息");
+   strcpy(msg->msg,"你还没有添加任何好友或群组,按enter键继续!");
    send(user.fd, msg, MSG_L, 0);
    return;
 }
@@ -1076,9 +1511,385 @@ strcpy(msg->sender,"群名");
        continue;
     }
    }
-strcpy(msg->sender,"server");
+strcpy(msg->sender,"系统消息");
 memset(msg->msg, 0, MSG_L);
 strcpy(msg->msg,"点击enter继续!");
 fclose(fp);
 send(user.fd, msg, MSG_L, 0);
+}
+
+void manage_group(MSG *msg, USER user)//群主用此函数管理群
+{
+  char path[24],path_t[24];//路径
+  int flag;//标志联系人数目
+  char temp[24];//临时保存姓名
+  FILE *fp, *fp2;
+  LINKMAN friend_user,myself;
+  
+  myself.type = 'f';
+  strcpy(myself.name,user.username);
+  
+  memset(path, 0, sizeof(path));
+  strcpy(path_t,"G_");
+  strcat(path_t,user.username);
+  if((fp = fopen(path_t,"r")) == NULL)
+  {
+    MSG inform;
+    char path_1[24];
+    strcpy(path_1,"L_");
+    strcat(path_1,user.username);
+    
+    fp = fopen(path_t,"w");
+    fwrite(&myself,sizeof(myself),1,fp);
+    fclose(fp);//创建本用户的群
+     fp = fopen(path_1,"a");
+     myself.type = 'g';
+     fwrite(&myself,sizeof(myself),1,fp);
+     fclose(fp);//将本群添加到群主联系人文件
+    strcpy(inform.command,"single_chat");
+    strcpy(inform.sender,"系统消息");
+    strcpy(inform.receiver,user.username);
+    memset(inform.msg, 0, sizeof(inform.msg));
+    strcpy(inform.msg,"已为您创建群:");
+    strcat(inform.msg,path_t);
+    strcat(inform.msg," ,并将本群添加到你所加的群目录里 !");
+    send(user.fd, &inform, MSG_L, 0);
+  }
+  fp = fopen(path_t,"r");
+  if (strcmp(msg->command,"sys_group_del") == 0)
+  {
+    if (fp == NULL)
+    {
+	  strcpy(msg->command,"single_chat");
+	  strcpy(msg->sender,"系统消息");
+	  strcpy(msg->receiver,user.username);
+	  strcpy(temp,msg->msg);
+	  memset(msg->msg, 0, MSG_L);
+	  strcpy(msg->msg,"任务未执行,你还未创建群");
+	  strcat(msg->msg,",按enter键继续!");
+	  send(user.fd, msg, MSG_L, 0);
+	  return;
+    }
+    else
+    {
+      int is_there = 0;
+      while(fread(&friend_user, sizeof(friend_user),1, fp) != 0)
+      {
+	if (strcmp(friend_user.name,msg->msg) == 0)
+	{
+	  is_there = 1;
+	}
+      }
+      if (is_there == 0)
+      {
+	  strcpy(msg->command,"single_chat");
+	  strcpy(msg->sender,"系统消息");
+	  strcpy(msg->receiver,user.username);
+	  strcpy(temp,msg->msg);
+	  memset(msg->msg, 0, MSG_L);
+	  strcpy(msg->msg,"任务未执行,没有:");
+	  strcat(msg->msg,temp);
+	  strcat(msg->msg,",按enter键继续!");
+	  send(user.fd, msg, MSG_L, 0);
+	  fclose(fp);
+	  return;
+      }
+      fclose(fp);
+      char oldfile[26],newfile[26],name_to_del[NAME_L];
+      strcpy(name_to_del,msg->msg);
+      memset(newfile, 0, sizeof(newfile));
+      memset(oldfile, 0, sizeof(oldfile));
+      strcpy(oldfile,"G_");
+      strcat(oldfile,user.username);
+      strcpy(newfile,"TG_");
+      strcat(newfile,user.username);
+      fp = fopen(oldfile,"r");
+      fp2 = fopen(newfile,"w");
+      while(fread(&friend_user, sizeof(friend_user),1, fp) != 0)
+      {
+	if (strcmp(friend_user.name,name_to_del) != 0)
+	{
+	  is_there++;
+	  if (fwrite(&friend_user, sizeof(friend_user), 1,fp2) != 1)
+	  {
+	    strcpy(msg->sender,"系统消息");
+	    strcpy(msg->receiver,user.username);
+	    memset(msg->msg, 0, MSG_L);
+	    strcpy(msg->msg,"任务执行出错,丢失了:");
+	    strcat(msg->msg,friend_user.name);
+	    strcat(msg->msg,",稍后请手动添加!");
+	    send(user.fd, msg, MSG_L, 0);
+	  }
+	}
+      }
+      fclose(fp);
+      fclose(fp2);
+      if (is_there > 1)
+      {
+	rename(newfile,oldfile);
+      }
+      else
+      {
+	fp = fopen(oldfile,"w");
+	fclose(fp);
+	remove(newfile);
+      }
+      memset(newfile, 0, sizeof(newfile));
+      memset(oldfile, 0, sizeof(oldfile));
+      strcpy(oldfile,"L_");
+      strcat(oldfile,name_to_del);
+      strcpy(newfile,"T_");
+      strcat(newfile,name_to_del);
+      fp = fopen(oldfile,"r");
+      fp2 = fopen(newfile,"w");
+      is_there = 1;
+      while(fread(&friend_user, sizeof(friend_user),1, fp) != 0)
+      {
+	if (strcmp(friend_user.name,user.username) != 0 || friend_user.type == 'f')
+	{
+	  is_there++;
+	  if (fwrite(&friend_user, sizeof(friend_user), 1,fp2) != 1)
+	  {
+	    strcpy(msg->sender,"系统消息");
+	    strcpy(msg->receiver,msg->msg);
+	    memset(msg->msg, 0, MSG_L);
+	    strcpy(msg->msg,"任务执行出错,丢失了:");
+	    strcat(msg->msg,friend_user.name);
+	    strcat(msg->msg,",稍后请手动添加!");
+	    send_to_one(msg, user.fd);
+	  }
+	}
+      }
+      fclose(fp);
+      fclose(fp2);
+      if (is_there > 1)
+      {
+	rename(newfile,oldfile);
+      }
+      else
+      {
+	fp = fopen(oldfile,"w");
+	fclose(fp);
+	remove(newfile);
+      }
+      strcpy(msg->command,"single_chat");
+      strcpy(msg->sender,"系统消息");
+      strcpy(msg->receiver,user.username);
+      memset(msg->msg, 0, MSG_L);
+      strcpy(msg->msg,"删除:");
+      strcat(msg->msg,name_to_del);
+      strcat(msg->msg,"成功,同时已将本群从对方好友列表删除,点击enter继续!");
+      send(user.fd, msg, MSG_L, 0);
+      strcpy(msg->command,"single_chat");
+      strcpy(msg->sender,"系统消息");
+      strcpy(msg->receiver,name_to_del);
+      memset(msg->msg, 0, MSG_L);
+      strcpy(msg->msg,name_to_del);
+      strcat(msg->msg,"你好,");
+      strcat(msg->msg,user.username);
+      strcat(msg->msg," 已将你从她/他的群删除,系统已替你将他/她的群从联系人列表删除,点击enter继续!");
+      send_to_one(msg, user.fd);
+      return;
+    }
+  }
+  fp = fopen(path_t,"r");
+  if ((fp != NULL) && (strcmp(msg->command,"sys_group_del") != 0))
+  {
+    while(fread(&friend_user, sizeof(friend_user),1, fp) != 0)
+    {
+      if (strcmp(friend_user.name,msg->msg) == 0)
+      {
+	strcpy(msg->command,"single_chat");
+	strcpy(msg->sender,"系统消息");
+	strcpy(msg->receiver,user.username);
+	strcpy(temp,msg->msg);
+	memset(msg->msg, 0, MSG_L);
+	strcpy(msg->msg,"任务未执行,已有:");
+	strcat(msg->msg,temp);
+	strcat(msg->msg,",按enter键继续!");
+	send(user.fd, msg, MSG_L, 0);
+	return;
+      }
+    }
+    flag = 0;
+    fclose(fp);
+  }
+  else
+    flag = 0;
+  
+  if (strcmp(msg->command,"sys_group_add") == 0)
+  {
+    if (is_name_used(&flag, msg->msg) == 0)
+    {
+      strcpy(msg->command,"single_chat");
+      strcpy(msg->sender,"系统消息");
+      strcpy(msg->receiver,user.username);
+      strcpy(temp,msg->msg);
+      memset(msg->msg, 0, MSG_L);
+      strcpy(msg->msg,"向本群添加:");
+      strcat(msg->msg,temp);
+      strcat(msg->msg,"失败,未找到,请重试!");
+      send(user.fd, msg, MSG_L, 0);
+      return;
+    }
+    else if (flag == 1)
+    {
+      LINKMAN user_now;
+      user_now.type = 'g';
+      strcpy(user_now.name,user.username);
+      strcpy(friend_user.name,msg->msg);
+      friend_user.type = 'f';
+      strcpy(path,"G_");
+      strcat(path,user.username);
+      fp = fopen(path,"a");
+      memset(path_t, 0, sizeof(path_t));
+      strcpy(path_t,"L_");
+      strcat(path_t,msg->msg);
+      fp2 = fopen(path_t,"a");
+      if ((fwrite(&friend_user, sizeof(LINKMAN), 1, fp) != 1) || (fwrite(&user_now, sizeof(LINKMAN), 1, fp2) != 1))
+      {
+	strcpy(msg->command,"single_chat");
+	strcpy(msg->sender,"系统消息");
+	strcpy(msg->receiver,user.username);
+	strcpy(temp,msg->msg);
+	memset(msg->msg, 0, MSG_L);
+	strcpy(msg->msg,"添加好友:");
+	strcat(msg->msg,temp);
+	strcat(msg->msg,"失败,保存失败,请重试!");
+	send(user.fd, msg, MSG_L, 0);
+	fclose(fp);
+	return;
+      }
+      else
+      {
+	fclose(fp);
+	fclose(fp2);
+	strcpy(msg->command,"single_chat");
+	strcpy(msg->sender,"系统消息");
+	strcpy(msg->receiver,user.username);
+	strcpy(temp,msg->msg);
+	memset(msg->msg, 0, MSG_L);
+	strcpy(msg->msg,"向本群添加:");
+	strcat(msg->msg,temp);
+	strcat(msg->msg,"成功,同时对方已添加本群,点击enter继续!");
+	send(user.fd, msg, MSG_L, 0);
+	strcpy(msg->command,"single_chat");
+	strcpy(msg->sender,"系统消息");
+	memset(msg->msg, 0, MSG_L);
+	strcpy(msg->msg,"用户: ");
+	strcat(msg->msg,msg->receiver);
+	strcpy(msg->receiver,temp);
+	strcat(msg->msg,"已添加你到她/他的群,已自动添加他/她的群,点击enter继续!");
+	send_to_one(msg, user.fd);
+	return;
+      }
+    }
+  }
+  else if (strcmp(msg->command,"sys_group_show") == 0)
+  {
+    strcpy(path,"G_");
+    strcat(path,user.username);
+    if ((fp = fopen(path,"r")) ==NULL)
+    {
+       strcpy(msg->command,"single_chat");
+      strcpy(msg->sender,"系统消息");
+      strcpy(msg->receiver,user.username);
+      strcpy(temp,msg->msg);
+      strcpy(msg->msg,"查看群:");
+      strcat(msg->msg,temp);
+      strcat(msg->msg,"失败,未找到,请重试!");
+      send(user.fd, msg, MSG_L, 0);
+      return;
+    }
+    else
+    {
+	 STUD *p;
+	 LINKMAN linkman;
+      	strcpy(msg->command,"single_chat");
+	 strcpy(msg->sender,"联系人ID");
+	 while(fread(&linkman, sizeof(linkman), 1, fp) != 0)
+	  {
+	    if (linkman.type == 'f')
+	    {
+		  p = search_stud(&head,linkman.name);
+		  if (p != NULL)
+		  {
+		      memset(msg->msg, 0, MSG_L);
+		      strcpy(msg->msg,linkman.name);
+		      strcat(msg->msg,"  状态: 在线");
+		      send(user.fd, msg, MSG_L, 0);
+		      p = NULL;
+		      continue;
+		}
+		else
+		{
+		  memset(msg->msg, 0, MSG_L);
+		  strcpy(msg->msg,linkman.name);
+		  strcat(msg->msg,"  状态: 离线");
+		  send(user.fd, msg, MSG_L, 0);
+		  p = NULL;
+		  continue;
+		}
+	  }
+	}
+
+	strcpy(msg->command,"single_chat");
+	strcpy(msg->sender,"系统消息");
+	strcpy(msg->receiver,user.username);
+	memset(msg->msg, 0, MSG_L);
+	strcat(msg->msg,"点击enter继续!");
+	send(user.fd, msg, MSG_L, 0);
+	return;
+      }
+    }
+  }
+
+void manage_group_client(MSG* msg, USER user)//群管理的客户端函数
+{ 
+  getchar();
+  if (strcmp(msg->command,"sys_group_add") == 0)
+  {
+    printf("要添加的用户ID>>:");
+   while(input_string(msg->msg, sizeof(msg->msg)) <= 0)
+    {
+      if (strcmp(msg->msg,"exit") ==0)
+      {
+	//send(fd, "continue", strlen("continue"), 0);
+	return;
+      }
+      printf("用户ID不能为空,请重新输入!\n");
+    }
+    send(user.fd, msg, MSG_L, 0);
+   return;
+  }
+  else if (strcmp(msg->command,"sys_group_del") == 0)
+  {
+    printf("要删除的好友ID>>:");
+   while(input_string(msg->msg, sizeof(msg->msg)) <= 0)
+    {
+      if (strcmp(msg->msg,"exit") ==0)
+      {
+	//send(fd, "continue", strlen("continue"), 0);
+	return;
+      }
+      printf("ID不能为空,请重新输入!\n");
+    }
+    send(user.fd, msg, MSG_L, 0);
+   return;
+  }
+  /*else if (strcmp(msg->command,"sys_delete_client") == 0)
+    {
+    printf("要删除的好友或群ID>>:");
+   while(input_string(msg->msg, sizeof(msg->msg)) <= 0)
+    {
+      if (strcmp(msg->msg,"exit") ==0)
+      {
+	//send(fd, "continue", strlen("continue"), 0);
+	return;
+      }
+      printf("ID不能为空,请重新输入!\n");
+    }
+    send(fd, msg, MSG_L, 0);
+   return;
+  }*/
 }
