@@ -27,11 +27,14 @@ int main(int argc, char *argv[])
 	int t;
 	char r_msg[MSG_MAX_L] , s_msg[MSG_MAX_L];
 	char result = 'n';
+	char log1[50];
+	
 	pthread_t pid[LIST_MAX];
 	struct sockaddr_in server_addr, client_addr;
 	USER user[LIST_MAX];
-	FILE *fp;
+	FILE *fp,*log_fp;
 	
+	strcpy(log1,"检测到新的IP:");
 	fp = fopen("Clients","a");
 	fclose(fp);
 	
@@ -70,7 +73,10 @@ int main(int argc, char *argv[])
 		{
 			my_err("accept", __LINE__);
 		}
+		log_fp = fopen("SYS_LOG.txt","a");
 	  printf("Detected New Client,IP:%s\n",inet_ntoa(client_addr.sin_addr));
+	  fprintf(log_fp,"%s,%s\n",log1,inet_ntoa(client_addr.sin_addr));
+	  fclose(log_fp);
 	  t = user[clients].fd;
 	  printf("clients: %d,id:--%d\n",clients,user[clients].fd);
 	 

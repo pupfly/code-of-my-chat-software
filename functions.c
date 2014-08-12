@@ -31,7 +31,7 @@ void mainmenu()//在客户端打印菜单的函数
   printf("--------飞哥传书--------\n\n\n");
   printf("       1.注册账号\n\n");
   printf("       2.用户登录\n\n");
-  printf("       3.退出系统\n");
+  printf("       3.退出系统\n\n");
   printf("请选择>>:");
 }
 
@@ -47,8 +47,7 @@ void submenu(char username[NAME_L])//在客户端打印子菜单的函数
   printf("       6.管理的群\n");
   printf("       7.好友私聊\n");
   printf("       8.开启群聊\n");
-  printf("       9.修改资料\n");
-  printf("       0.注销登录\n");
+  printf("       9.退出系统\n");
   printf("请选择:\n");
 }
 
@@ -113,6 +112,24 @@ int send_msg(MSG *msg, int fd, char cmd[24])
 
 	if (strcmp(cmd,"single_chat") == 0)
 	{
+	  send(fd, msg, sizeof(MSG), 0);
+	  len = input_string((*msg).msg,MSG_MAX_L);
+	  while(strcmp((*msg).msg,"exit") != 0)
+	  {
+	    if (len > 0)
+	    {
+	      if (send(fd, msg, sizeof(MSG), 0) < 0)
+	      {
+		my_err("send",__LINE__);
+	      }
+	    }
+	  printf("%s:",msg->sender);
+	  len = input_string((*msg).msg,MSG_MAX_L);
+	  }
+	}
+	else if (strcmp(cmd,"group_chat") == 0)
+	{
+	  send(fd, msg, sizeof(MSG), 0);
 	  len = input_string((*msg).msg,MSG_MAX_L);
 	  while(strcmp((*msg).msg,"exit") != 0)
 	  {
@@ -148,8 +165,8 @@ int receive_msg(MSG *msg, int fd, int msg_buf_len)
 	
 	if ((len = recv(fd, msg, msg_buf_len, 0)) < 0)
 	{
-		printf("receive error\n");
-		return -1;
+		printf("receive---error\n");
+		pthread_exit(0);
 	}
 	return len;
 }
@@ -184,10 +201,12 @@ void send_to_one(MSG *msg_r, int fd)//从消息里面解析出接受者并向其
       }
   else
   {
-    strcpy(msg_s.command,"single_chat");
-    strcpy(msg_s.msg,"无此联系人,请输入exit返回!");
-    strcpy(msg_s.sender,"服务器");
-    send(fd, &msg_s, MSG_L, 0);
+    /*strcpy(msg_s.command,"single_chat");
+    strcpy(msg_s.msg,"将稍后通知:");
+    strcat(msg_s.msg,msg_r->receiver);
+    strcat(msg_s.msg,"按回车键继续!");
+    strcpy(msg_s.sender,"信息中转站:");
+    send(fd, &msg_s, MSG_L, 0);*/
   }
 }
 
@@ -198,19 +217,166 @@ void *serve_chat(void *arg)
   MSG msg_cmd;
   
   
-  user->result = 'n';
+  user->result = 'y';
   
   while(1)
   {
     memset(&msg_cmd, 0, sizeof(MSG));
-    if (receive_msg(&msg_cmd, user->fd, sizeof(MSG)) < 0)
-      break;
+    if (user->result == 'y')
+    {
+      if (receive_msg(&msg_cmd, user->fd, sizeof(MSG)) < 0)
+      {
+	printf("1111\n");
+	return;
+	exit(0);
+      }
+    }
+    else
+    {
+      *user->order--;
+      close(user->fd);
+      return;
+    }
     if (strcmp(msg_cmd.command,"single_chat") == 0)
     {
-      send_to_one(&msg_cmd, user->fd);
+      char path_user[24];
+      MSG msg_single;
+      FILE *lp;
+      LINKMAN friend_l;
+      int is_friend_exist = 0;
+      
+      memset(&msg_single, 0, MSG_L);
+      strcpy(msg_single.command,"single_chat");
+      strcpy(msg_single.sender,"系统消息");
+      strcpy(msg_single.receiver,user->username);
+      
+      memset(path_user, 0, sizeof(path_user));
+      strcpy(path_user,"L_");
+      strcat(path_user,user->username);
+      
+      lp = fopen(path_user,"r") ;
+      if (lp != NULL)
+      {
+	while(fread(&friend_l,sizeof(friend_l),1, lp) != 0)
+	{
+	  if ((strcmp(friend_l.name,msg_cmd.receiver) == 0) && (friend_l.type == 'f'))
+	  {
+	    is_friend_exist = 1;
+	    send_to_one(&msg_cmd, user->fd);
+	    fclose(lp);
+	    break;
+	  }
+	}
+	if (is_friend_exist != 1)
+	{
+	  fclose(lp);
+	  strcpy(msg_single.msg,"您并没有添加联系人:");
+	  strcat(msg_single.msg,msg_cmd.receiver);
+	  strcat(msg_single.msg,",消息将不能发送,建议输入exit返回!");
+	  send(user->fd, &msg_single, MSG_L, 0);
+	}  
+      }
+      else
+	{
+	  //strcpy(msg_single.command,"single_chat");
+	  strcpy(msg_single.msg,"您并没有添加任何联系人,例如:");
+	  strcat(msg_single.msg,msg_cmd.receiver);
+	  strcat(msg_single.msg,",消息将不能发送,建议输入exit返回!");
+	  send(user->fd, &msg_single, MSG_L, 0);
+	}
+      
+    }
+    else if (strcmp(msg_cmd.command,"group_chat") == 0)
+    {
+      char path_user[24];
+      MSG msg_single;
+      FILE *lp;
+      LINKMAN friend_l;
+      int is_group_exist = 0;
+      
+      memset(&msg_single, 0, MSG_L);
+      strcpy(msg_single.command,"single_chat");
+      strcpy(msg_single.sender,"系统消息");
+      strcpy(msg_single.receiver,user->username);
+      
+      memset(path_user, 0, sizeof(path_user));
+      strcpy(path_user,"L_");
+      strcat(path_user,user->username);
+      
+      lp = fopen(path_user,"r") ;
+      if (lp != NULL)
+      {
+	while(fread(&friend_l,sizeof(friend_l),1, lp) != 0)
+	{
+	  if ((strcmp(friend_l.name,msg_cmd.receiver) == 0) && (friend_l.type == 'g'))
+	  {
+	    is_group_exist = 1;
+	    fclose(lp);
+	    {
+		char group_name[24];
+		LINKMAN member;
+		FILE *gp;
+      
+		memset(group_name, 0, sizeof(group_name));
+		strcpy(group_name,"G_");
+		 strcat(group_name,msg_cmd.receiver);
+		 gp = fopen(group_name,"r");
+		 if (gp != NULL)
+		  {
+		      memset(msg_cmd.command, 0, sizeof(msg_cmd.command));
+		      strcpy(msg_cmd.command,"single_chat");
+		      while(fread(&member, sizeof(member), 1, gp) != 0)
+		      {
+			  if ((member.type != 'g') && (strcmp(member.name,user->username) != 0))
+			    {
+				memset(msg_cmd.receiver, 0,  sizeof(msg_cmd.receiver));
+				strcpy(msg_cmd.receiver,member.name);
+				send_to_one(&msg_cmd, user->fd);
+			    }
+		      }
+		  }
+		  else
+		{
+		    MSG msg_temp;
+		    memset(&msg_temp, 0, MSG_L);
+		    strcpy(msg_temp.command,"single_chat");
+		    strcpy(msg_temp.sender,"系统消息");
+		    strcpy(msg_temp.receiver,user->username);
+		    strcpy(msg_temp.msg,"并没有群:");
+		    strcat(msg_temp.msg,msg_cmd.receiver);
+		    strcat(msg_temp.msg,",消息将不能发送,建议输入exit返回!");
+		    send(user->fd, &msg_temp, MSG_L, 0);
+		}
+	    }
+	    break;
+	  }
+	}
+	if (is_group_exist != 1)
+	{
+//	  strcpy(msg_single.command,"single_chat");
+//	  strcpy(msg_single.sender,"系统消息");
+	  strcpy(msg_single.receiver,user->username);
+	  strcpy(msg_single.msg,"您并没有添加群:");
+	  strcat(msg_single.msg,msg_cmd.receiver);
+	  strcat(msg_single.msg,",消息将不能发送,建议输入exit返回!");
+	  send(user->fd, &msg_single, MSG_L, 0);
+	}  
+      }
+      else
+	{
+//	  strcpy(msg_single.command,"single_chat");
+//	  strcpy(msg_single.sender.sender,"系统消息");
+	  strcpy(msg_single.msg,"您并没有添加任何联系人,例如群:");
+	  strcat(msg_single.msg,msg_cmd.receiver);
+	  strcat(msg_single.msg,",消息将不能发送,建议输入exit返回!");
+	  send(user->fd, &msg_single, MSG_L, 0);
+	}
+      
+     
     }
     else if (strcmp(msg_cmd.command,"sys_authorise") == 0)
     {
+      user->result = 'n';
       authorise_server(user->fd, user->username, &(user->result));
       if (user->result == 'y')
       {
@@ -225,6 +391,7 @@ void *serve_chat(void *arg)
     }
     else if (strcmp(msg_cmd.command,"sys_login") == 0)
     {
+      user->result = 'n';
       login_serve(user->fd, user->username, &(user->result));
       if (user->result == 'y')
       {
@@ -260,6 +427,20 @@ void *serve_chat(void *arg)
     else if (strcmp(msg_cmd.command,"sys_group_add") == 0 || strcmp(msg_cmd.command,"sys_group_del") == 0 || strcmp(msg_cmd.command,"sys_group_show") == 0)
     {
       manage_group(&msg_cmd,*user);
+    }   
+    else if (strcmp(msg_cmd.command,"client_exit") == 0)
+    {
+      *(user->order)--;
+      send(user->fd, &msg_cmd, MSG_L, 0);
+      close(user->fd);
+      delete_from_stud(&head,*user);
+      pthread_exit(0);
+    }
+    else if (strcmp(msg_cmd.command,"client_shutdown") == 0)
+    {
+      *user->order--;
+      close(user->fd);
+      pthread_exit(0);
     }
   }
 }
@@ -307,9 +488,13 @@ void *client_recv(void *arg)
     {
       printf("%s: %s\n",msg_r.sender,msg_r.msg);
     }
-    else if (strcmp(msg_r.command,"sys_add") == 0)
+    else if (strcmp(msg_r.command,"client_exit") == 0)
     {
-      //add_friend_client();
+      close(user->fd);
+      system("clear");
+      printf("即将退出,欢迎下次使用!\n");
+      sleep(1);
+      pthread_exit(0);
     }
   }
 }
@@ -333,7 +518,7 @@ void *client_send(void *arg)
 	strcpy(msg_s.receiver,"server");
 	strcpy(msg_s.sender,user->username);
 	system("clear");
-	printf("我的资料:\n");
+	printf("--------我的资料--------\n");
 	send(user->fd, &msg_s, MSG_L, 0);
 	getchar();
 	getchar();
@@ -344,7 +529,7 @@ void *client_send(void *arg)
 	strcpy(msg_s.receiver,"server");
 	strcpy(msg_s.sender,user->username);
 	system("clear");
-	printf("我的联系人:\n");
+	printf("--------我的联系人--------\n");
 	send(user->fd, &msg_s, MSG_L, 0);
 	getchar();
 	break;
@@ -353,7 +538,7 @@ void *client_send(void *arg)
 	strcpy(msg_s.receiver,"server");
 	strcpy(msg_s.sender,user->username);
 	system("clear");
-	printf("在线好友:\n");
+	printf("--------在线好友--------\n");
 	send(user->fd, &msg_s, MSG_L, 0);
 	getchar();
 	getchar();
@@ -363,7 +548,7 @@ void *client_send(void *arg)
 	strcpy(msg_s.receiver,"server");
 	strcpy(msg_s.sender,user->username);
 	system("clear");
-	printf("我在的群:\n");
+	printf("--------我在的群--------\n");
 	send(user->fd, &msg_s, MSG_L, 0);
 	getchar();
 	getchar();
@@ -444,11 +629,29 @@ void *client_send(void *arg)
 	getchar();
 	break;
       case '7':
+	printf("--------私聊模式--------\n");
+	printf("--------输入exit为退出!\n");
 	printf("输入对方ID:");
 	scanf("%s",msg_s.receiver);
 	strcpy(msg_s.sender,user->username);
 	strcpy(msg_s.command,"single_chat");
 	send_msg(&msg_s, user->fd, msg_s.command); 
+	break;
+      case '8':
+	printf("--------群聊模式--------\n");
+	printf("--------输入exit为退出!\n");
+	printf("输入群ID:");
+	scanf("%s",msg_s.receiver);
+	strcpy(msg_s.sender,user->username);
+	strcpy(msg_s.command,"group_chat");
+	send_msg(&msg_s, user->fd, msg_s.command); 
+	break;
+      case '9':
+	strcpy(msg_s.sender,user->username);
+	strcpy(msg_s.receiver,"server");
+	strcpy(msg_s.command,"client_exit");
+	send(user->fd,&msg_s, MSG_L, 0);
+	pthread_exit(0);
 	break;
     }
   }
@@ -504,8 +707,11 @@ int is_client_exist(int *flag, char *name, char password[PSD_L])//查询用户�
 void authorise_server(int fd, char username[NAME_L], char *result)//用户注册函数,服务端
 {
   FILE *fp;
+  FILE *fp_log;
   int flag = 1;
   CLIENT client;
+  
+  memset(&client, 0, sizeof(client));
   
   *result = 'n';
   
@@ -562,8 +768,11 @@ if (fwrite(&client, sizeof(client), 1, fp) == 0)
 }
 else
 {
+  fp_log = fopen("SYS_LOG.txt","a");
   printf("用户: %s 注册成功!\n",client.name);
+  fprintf(fp_log,"用户: %s 注册成功!\n",client.name);
   *result = 'y';
+  fclose(fp_log);
   send(fd, "success",strlen("success"), 0);
   fclose(fp);
 }
@@ -594,7 +803,12 @@ void authorise_client(int fd, USER *user)//用户注册函数,客户端
   while(strcmp(status,"fail") == 0)
   {
     printf("对不起,系统已存在用户: %s ,请重新输入>>:\n",client.name);
-    input_string(client.name, sizeof(client.name));
+     while(input_string(client.name, sizeof(client.name)) <= 0)
+    {
+      IS_EXIT(client.name,fd);
+      printf("ID不能为空,系统要求重新输入!\n");
+      printf("请输入您的ID(1~16个字符)>>:\n");
+    }
     IS_EXIT(client.name,fd);
     send(fd, client.name,strlen(client.name), 0);
     receive(status, fd, sizeof(status));
@@ -704,6 +918,7 @@ void login_serve(int fd, char username[NAME_L], char *result)//登陆函数,用�
   char name[NAME_L];
   char status[12];
   *result = 'n';
+  FILE *fp_log;
   
   while(flag == 0)
   {
@@ -730,7 +945,11 @@ void login_serve(int fd, char username[NAME_L], char *result)//登陆函数,用�
   }
   else if (strcmp(status,"logged") == 0)
   {
+    fp_log = fopen("SYS_LOG.txt","a");
     *result = 'y';
+    printf("用户: %s 登陆成功!\n",username);
+    fprintf(fp_log,"用户:%s登陆成功!\n",username);
+    fclose(fp_log);
     return;
   }
   *result = 'n';
@@ -748,7 +967,7 @@ void login_client(int fd, char username[NAME_L], char *result)//登陆函数,用
   printf("用户ID:");
   while(input_string(name, sizeof(name)) <= 0)
   printf("用户ID不能为空,请重新输入!\n");
-  send(fd, name, sizeof(name), 0);
+  send(fd, name, strlen(name), 0);
   receive(status, fd, sizeof(status));
   while(strcmp(status,"password") != 0)
   {
@@ -829,7 +1048,7 @@ void create_serve(MSG *msg, USER user)//添加或删除联系人与群,用flag,�
       int is_there = 0;
       while(fread(&friend_user, sizeof(friend_user),1, fp) != 0)
       {
-	if (strcmp(friend_user.name,msg->msg) == 0)
+	if ((strcmp(friend_user.name,msg->msg) == 0) && (friend_user.type == 'f'))
 	{
 	  is_there = 1;
 	}
@@ -1877,19 +2096,4 @@ void manage_group_client(MSG* msg, USER user)//群管理的客户端函数
     send(user.fd, msg, MSG_L, 0);
    return;
   }
-  /*else if (strcmp(msg->command,"sys_delete_client") == 0)
-    {
-    printf("要删除的好友或群ID>>:");
-   while(input_string(msg->msg, sizeof(msg->msg)) <= 0)
-    {
-      if (strcmp(msg->msg,"exit") ==0)
-      {
-	//send(fd, "continue", strlen("continue"), 0);
-	return;
-      }
-      printf("ID不能为空,请重新输入!\n");
-    }
-    send(fd, msg, MSG_L, 0);
-   return;
-  }*/
 }

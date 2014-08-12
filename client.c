@@ -18,8 +18,19 @@
 
 #include "functions.h"
 
+void print_tip(int signo)
+{
+  printf("警告:不支持强制退出!\n");
+  return;
+}
+
 int main(int argc, char *argv[])
 {
+	sigset_t newmask,oldmask;
+	signal(SIGINT, print_tip);
+	sigemptyset(&newmask);
+	sigaddset(&newmask,SIGINT);
+	sigprocmask(SIG_BLOCK, &newmask, &oldmask);
 	int server_addr_len, *status1, *status2;
 	int r_len;
 	char s_msg[MSG_MAX_L];
@@ -65,8 +76,12 @@ int main(int argc, char *argv[])
 		break;
 	      else
 	      {
-		close(user.fd);
-		return;
+	      send(user.fd,"exit", 4, 0);
+	      *user.order--;
+	      close(user.fd);
+	      printf("即将退出,欢迎下次使用!\n");
+	      sleep(1);
+	      return;
 	      }
 	      break;
 	    case '2':
@@ -77,10 +92,23 @@ int main(int argc, char *argv[])
 		break;
 	      else
 	      {
-		close(user.fd);
+		strcpy(msg.command,"client_shutdown");
+	      send(user.fd, &msg, MSG_L, 0);
+	      *user.order--;
+	      close(user.fd);
+	      printf("即将退出,欢迎下次使用!\n");
+	      sleep(1);
 		return;
 	      }
 	      break;
+	    case '3':
+	     strcpy(msg.command,"client_shutdown");
+	      send(user.fd, &msg, MSG_L, 0);
+	      *user.order--;
+	      close(user.fd);
+	      printf("即将退出,欢迎下次使用!\n");
+	      sleep(1);
+	      return;
 	  }
 	}
 	

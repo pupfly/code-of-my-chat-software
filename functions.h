@@ -29,17 +29,18 @@
 #include <sys/time.h>
 #include <time.h>
 #include <sys/select.h>
+#include <signal.h>
 
 #define PORT 6666        //端口
 #define LIST_MAX 500     //等待队列长度,系统可服务的最大客户数
 #define MSG_MAX_L 100   //每条消息信息最大长度
-#define SERVER_IP "192.168.1.106" //服务端IP
+#define SERVER_IP "127.0.0.1" //服务端IP
 #define NAME_L 16      //用户名长度
 #define STUD struct stud     //重命名链表结构体
 #define ADDR_L 12      //用户地址长度,用于注册
 #define SIG_L 50         //个性签名长度
 #define PSD_L 16   //密码长度
-#define IS_EXIT(a,b)   if (strcmp(a,"exit") == 0) {send(b, a, strlen(a), 0); return;}//判断是否要退出
+#define IS_EXIT(a,b)   if (strcmp(a,"exit") == 0) {send(b, "exit", sizeof("exit") + 1, 0);return;}//判断是否要退出
 #define MSG_L sizeof(MSG) //消息结构体大小
 
 typedef struct//信息结构体
@@ -141,3 +142,4 @@ void show_mygroup(MSG *msg, USER user);//显示用户的群
 void manage_group(MSG *msg, USER user);//群主用此函数管理群
 
 void manage_group_client(MSG* msg, USER user);//群管理的客户端函数
+
